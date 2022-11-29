@@ -1,0 +1,23 @@
+[package]
+version = "1.0.0"
+title = "Pose logger"
+description = "Simple pose logger"
+authors = ["Jørgen Myrvold"]
+readme  = "docs/README.md"
+repository = "https://github.com/NVIDIA-Omniverse/kit-extension-template"
+category = "Example"
+keywords = ["kit", "example"]
+icon = "data/icon.png"
+preview_image = "data/preview.png"
+
+
+[dependencies]
+"omni.isaac.examples" = {}
+"omni.isaac.ui" = {}
+
+[[python.module]]
+name = "omni.isaac.pose_logger"
+
+
+[[test]]
+timeout = 960

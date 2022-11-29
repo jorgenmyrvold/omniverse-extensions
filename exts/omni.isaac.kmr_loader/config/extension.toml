@@ -1,0 +1,21 @@
+[package]
+version = "1.0.0"
+title = "KMR loader"
+description = "Extension for loading KUKA KMR iiwa into isaac sim"
+readme  = "docs/README.md"
+repository = "https://github.com/NVIDIA-Omniverse/kit-extension-template"
+category = "Example"
+keywords = ["kit", "example"]
+icon = "data/icon.png"
+preview_image = "data/preview.png"
+
+
+[dependencies]
+"omni.kit.uiapp" = {}
+
+# Main python module this extension provides, it will be publicly available as "import omni.hello.world".
+[[python.module]]
+name = "omni.isaac.kmr_loader"
+
+[[test]]
+timeout = 960
