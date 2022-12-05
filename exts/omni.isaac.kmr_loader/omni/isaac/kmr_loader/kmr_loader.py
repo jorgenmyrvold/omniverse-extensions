@@ -1,14 +1,15 @@
-from omni.isaac.examples.base_sample import BaseSample
 import omni.kit.commands
-from omni.isaac.urdf import _urdf
-from pxr import Sdf, Gf, UsdPhysics, Usd, UsdGeom
 import omni.graph.core as og
+from pxr import Sdf, Gf, UsdPhysics, Usd, UsdGeom
 from omni.isaac.core.utils.extensions import disable_extension, enable_extension
 from omni.isaac.core_nodes.scripts.utils import set_target_prims
-
+from omni.isaac.examples.base_sample import BaseSample
+from omni.isaac.urdf import _urdf
+# from omni.isaac.core.utils.utils import get_prim_path
 
 ENVIRONMENT_BASE_PATH = "omniverse://localhost/NVIDIA/Assets/Isaac/2022.1/Isaac/Environments/"
-KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr.urdf"
+# KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr.urdf"
+KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr_wo_wheels.urdf"
 OMNIWHEELS_PATH = "/home/jorgen/isaac_ws/omniwheels/"
 ROS2_FRAME_ID = "world"
 
@@ -69,9 +70,7 @@ class KMRLoader(BaseSample):
         res, self._lidar1_prim = self._create_lidar_sensor(is_front_lidar=True)
         res, self._lidar2_prim = self._create_lidar_sensor(is_front_lidar=False)
         self._load_omniwheels()
-        # TODO: Rig cameras
-        # self._create_camera("/World", "/Camera_1")
-        
+        self._create_cameras()
         return
 
     def _create_lidar_sensor(self, is_front_lidar: bool):
@@ -114,6 +113,15 @@ class KMRLoader(BaseSample):
         omnisheels_path should point to the directory where the four omniwheels with names
         omniwheel_fl.usd, omniwheel_fr.usd, omniwheel_rl.usd, omniwheel_rr.usd
         """
+        # Create scope to place the omniwheel joints in
+        joint_scope_prim_path = f"{self._kmr_prim}/omniwheel_joints"
+        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
+            prim_type="Scope",
+            prim_path=joint_scope_prim_path,
+            select_new_prim=False,
+            attributes={}
+        )
+
         omniwheels = {"omniwheel_fl": "front_left", 
                       "omniwheel_fr": "front_right", 
                       "omniwheel_rl": "back_left",
@@ -122,7 +130,6 @@ class KMRLoader(BaseSample):
         for prim_name, wheel in omniwheels.items():
             omniwheel_prim_path = f"{self._kmr_prim}/{prim_name}"
             omniwheel_prim = self._stage.DefinePrim(omniwheel_prim_path)
-            # omniwheel_prim = self._stage.GetPrimAtPath(f"{self._kmr_prim}/kmriiwa_{wheel}_wheel_link")
             omni.kit.commands.execute("AddReference",
                 stage=self._stage,
                 prim_path=Sdf.Path(omniwheel_prim_path),
@@ -142,29 +149,47 @@ class KMRLoader(BaseSample):
                 UsdGeom.Xformable(omniwheel_prim).AddTranslateOp().Set((-0.28, -0.4825, 0.17))
                 UsdGeom.Xformable(omniwheel_prim).AddRotateXYZOp().Set((0, 0, 90))
 
-            
-            # TODO: Create 4 joints and add bodies to their relationships
-            
-            # d6_props = _dynamic_control.DynamicControl.D6JointProperties()
+            success, joint_prim = omni.kit.commands.execute("CreateJointCommand",
+                stage=self._stage,
+                joint_type="Revolute",
+                from_prim=self._stage.GetPrimAtPath(f"{self._kmr_prim}/kmr_base_link"),
+                to_prim=self._stage.GetPrimAtPath(f"{omniwheel_prim_path}/{prim_name}/omniwheel")
+            )
 
-            # d6_props.GetRelationship("physic:body0").AddTarget(self._scene.GetPrimAtPath(f"{self._kmr_prim}/base_link"))
+            omni.kit.commands.execute("AddPhysicsComponent",
+                usd_prim=joint_prim,
+                component="PhysicsDrive:angular"
+            )
 
-            # joint = self._dc.create_d6_joint(d6_props)
-            # joint = self._stage.GetPrimAtPath(f"{self._kmr_prim}/kmriiwa_base_link/kmriiwa_{wheel}_wheel_joint")
-            # joint.GetRelationship("physics:body0").ClearTargets(removeSpec=False)
-            # joint.GetRelationship("physics:body1").ClearTargets(removeSpec=False)
-            # joint.GetRelationship("physics:body1").AddTarget(f"{self._kmr_prim}/kmriiwa_base_link")
-            # joint.GetRelationship("physics:body0").AddTarget(f"{omniwheel_prim_path}/{wheel}/omniwheel")
-            
+            omni.kit.commands.execute("ChangeProperty",
+                prop_path=f"{joint_prim.GetPrimPath()}.drive:angular:physics:damping",
+                value=10_000,  # Random value used in multiple isaac tutorials
+                prev=0
+            )
+
+            omni.kit.commands.execute("MovePrim",
+                path_from=joint_prim.GetPrimPath(),
+                path_to=f"{joint_scope_prim_path}/{prim_name}_joint"
+            )
 
         print("[+] Created omniwheels")
 
-    def _create_camera(self, parent_prim: str, camera_prim_name: str):
-        # TODO: Connect the camera to an existing prim on the robot
-        camera_prim = self._stage.DefinePrim(f"{parent_prim}{camera_prim_name}", "Camera")
-        UsdGeom.Xformable(camera_prim).AddTranslateOp().Set((0., 0., 1.))
-        UsdGeom.Xformable(camera_prim).AddRotateXYZOp().Set((90., 0., -90.))
-        print(f"[+] Created {parent_prim}{camera_prim_name}")
+    def _create_cameras(self):
+        camera_prefixes = ["camera_front", "camera_left", "camera_right", "camera_manipulator"]
+        for camera in camera_prefixes:
+            frame = "link"  # Which frame to mount the camera to
+            prim_path = f"{self._kmr_prim}/{camera}_{frame}/{camera}"
+            omni.kit.commands.execute("CreatePrimWithDefaultXform",
+                prim_type="Camera",
+                prim_path=prim_path,
+                attributes={'focusDistance': 400, 'focalLength': 24},  # Possible to set other parameters here
+            )
+            omni.kit.commands.execute("ChangeProperty",
+                prop_path=f"{prim_path}.xformOp:orient",
+                value=(0.5, 0.5, -0.5, -0.5),
+                prev=(0.5, 0.5, 0.5, 0.5)
+            )
+            print(f"[+] Created {camera}")
 
 
     def _setup_omnigraphs(self):
