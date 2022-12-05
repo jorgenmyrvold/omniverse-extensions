@@ -17,7 +17,7 @@ ROS2_FRAME_ID = "world"
 class KMRLoader(BaseSample):
     def __init__(self) -> None:
         super().__init__()
-        self.environment = "Grid/default_environment"
+        self.environment = "Simple_Warehouse/warehouse_with_forklifts"
         return
 
     def on_select_environment(self, env):
@@ -41,6 +41,8 @@ class KMRLoader(BaseSample):
         res, self._kmr_prim = self._load_kmr()
         self._rig_robot()
         self._setup_omnigraphs()
+        self._stage.SetDefaultPrim(self._stage.GetPrimAtPath(f"{self._kmr_prim}"))
+        print("KMR PRIM", self._stage.GetPrimAtPath(self._kmr_prim))
         return
     
     def _load_kmr(self, urdf_filepath=KMR_PATH):
@@ -118,8 +120,6 @@ class KMRLoader(BaseSample):
         omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
             prim_type="Scope",
             prim_path=joint_scope_prim_path,
-            select_new_prim=False,
-            attributes={}
         )
 
         omniwheels = {"omniwheel_fl": "front_left", 
@@ -193,19 +193,25 @@ class KMRLoader(BaseSample):
 
 
     def _setup_omnigraphs(self):
+        # self._og_scope_prim_path = f"{self._kmr_prim}/omnigraphs"
+        # omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
+        #     prim_type="Scope",
+        #     prim_path=self._og_scope_prim_path,
+        # )
+
         keys = og.Controller.Keys
-        self._setup_kmp_graph(keys)
-        self._setup_iiwa_graph(keys)
+        # self._setup_kmp_graph(keys)
+        # self._setup_iiwa_graph(keys)
         self._setup_lidar_graph(keys, is_front_lidar=True)
-        self._setup_lidar_graph(keys, is_front_lidar=False)
-        self._setup_tf_graph(keys)
-        self._setup_odom_graph(keys)
-        self._setup_camera_graph(keys)
+        # self._setup_lidar_graph(keys, is_front_lidar=False)
+        # self._setup_tf_graph(keys)
+        # self._setup_odom_graph(keys)
+        # self._setup_camera_graph(keys)
         return
     
     def _setup_kmp_graph(self, keys):
         # TODO: Not checked that the robot actually moves 
-        graph_prim_path = "/kmp_controller_graph"
+        graph_prim_path = f"{self._og_scope_prim_path}/kmp_controller_graph"
         og.Controller.edit(
             {"graph_path": graph_prim_path, "evaluator_name": "execution"},
             {
@@ -234,8 +240,8 @@ class KMRLoader(BaseSample):
                     ("constant_double_BL.inputs:value", -5.0),                               # 5       | -5
                     ("make_array_joint_names.inputs:arraySize", 4),
                     ("make_array_joint_vel.inputs:arraySize", 4),
-                    ("articulation_controller.inputs:robotPath", self._kmr_prim),
-                    ("articulation_controller.inputs:usePath", True),
+                    # ("articulation_controller.inputs:robotPath", self._kmr_prim),
+                    # ("articulation_controller.inputs:usePath", True),
                 ],
                 keys.CONNECT: [
                     ("on_playback_tick.outputs:tick", "articulation_controller.inputs:execIn"),
@@ -252,12 +258,15 @@ class KMRLoader(BaseSample):
                 ]
             }
         )
+        # read_lidar_og_path = f"{graph_path}/isaac_read_lidar_beam_node"
+        usd_prim = self._stage.GetPrimAtPath(f"{graph_prim_path}/articulation_controller")
+        usd_prim.GetRelationship("inputs:targetPrim").AddTarget(self._kmr_prim)
         print(f"[+] Created {graph_prim_path}")
     
     def _setup_iiwa_graph(self, keys):
         # Example from https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/tutorial_ros2_manipulation.html#add-joint-states-in-extension
         # TODO: Check that it publishes and subscribes as intended
-        graph_prim_path = "/iiwa_controller_graph"
+        graph_prim_path = f"{self._og_scope_prim_path}/iiwa_controller_graph"
         og.Controller.edit(
             {"graph_path": graph_prim_path, "evaluator_name": "execution"},
             {
@@ -290,6 +299,57 @@ class KMRLoader(BaseSample):
         set_target_prims(primPath=f"{graph_prim_path}/PublishJointState", targetPrimPaths=[self._kmr_prim])
         print(f"[+] Created {graph_prim_path}")
 
+    # Original lidar graph. Causes isaac sim to crash when called...
+    # def _setup_lidar_graph(self, keys, is_front_lidar: bool):
+    #     if is_front_lidar:
+    #         lidar_num = 1
+    #         lidar_frame_id = "kmriiwa_laser_B1_link"
+    #     else:
+    #         lidar_num = 2
+    #         lidar_frame_id = "kmriiwa_laser_B4_link"
+
+    #     lidar_prim_path = f"{self._kmr_prim}/{lidar_frame_id}/Lidar"
+    #     graph_path = f"/lidar{lidar_num}_graph"
+    #     og.Controller.edit(
+    #         {"graph_path": graph_path, "evaluator_name": "execution"},
+    #         {
+    #             keys.CREATE_NODES: [
+    #                 ("on_playback_tick", "omni.graph.action.OnPlaybackTick"),
+    #                 ("isaac_read_lidar_beam_node", "omni.isaac.range_sensor.IsaacReadLidarBeams"),
+    #                 ("ros2_context", "omni.isaac.ros2_bridge.ROS2Context"),
+    #                 ("constant_string_frame_id", "omni.graph.nodes.ConstantString"),
+    #                 ("isaac_read_sim_time", "omni.isaac.core_nodes.IsaacReadSimulationTime"),
+    #                 ("ros2_pub_laser_scan", "omni.isaac.ros2_bridge.ROS2PublishLaserScan"),
+    #             ],
+    #             keys.SET_VALUES: [
+    #                 ("ros2_pub_laser_scan.inputs:topicName", f"/laser_scan{lidar_num}"),
+    #                 ("constant_string_frame_id.inputs:value", lidar_frame_id),
+    #                 ("ros2_context.outputs:context", 0),
+    #             ],
+    #             keys.CONNECT: [
+    #                 ("on_playback_tick.outputs:tick", "isaac_read_lidar_beam_node.inputs:execIn"),
+    #                 ("isaac_read_lidar_beam_node.outputs:execOut", "ros2_pub_laser_scan.inputs:execIn"),
+    #                 ("isaac_read_lidar_beam_node.outputs:azimuthRange", "ros2_pub_laser_scan.inputs:azimuthRange"),
+    #                 ("isaac_read_lidar_beam_node.outputs:depthRange", "ros2_pub_laser_scan.inputs:depthRange"),
+    #                 ("isaac_read_lidar_beam_node.outputs:horizontalFov", "ros2_pub_laser_scan.inputs:horizontalFov"),
+    #                 ("isaac_read_lidar_beam_node.outputs:horizontalResolution", "ros2_pub_laser_scan.inputs:horizontalResolution"),
+    #                 ("isaac_read_lidar_beam_node.outputs:intensitiesData", "ros2_pub_laser_scan.inputs:intensitiesData"),
+    #                 ("isaac_read_lidar_beam_node.outputs:linearDepthData", "ros2_pub_laser_scan.inputs:linearDepthData"),
+    #                 ("isaac_read_lidar_beam_node.outputs:numCols", "ros2_pub_laser_scan.inputs:numCols"),
+    #                 ("isaac_read_lidar_beam_node.outputs:numRows", "ros2_pub_laser_scan.inputs:numRows"),
+    #                 ("isaac_read_lidar_beam_node.outputs:rotationRate", "ros2_pub_laser_scan.inputs:rotationRate"),
+    #                 ("ros2_context.outputs:context", "ros2_pub_laser_scan.inputs:context"),
+    #                 ("constant_string_frame_id.inputs:value", "ros2_pub_laser_scan.inputs:frameId"),
+    #                 ("isaac_read_sim_time.outputs:simulationTime", "ros2_pub_laser_scan.inputs:timeStamp"),
+    #             ],
+    #         }
+    #     )
+        
+    #     read_lidar_og_path = f"{graph_path}/isaac_read_lidar_beam_node"
+    #     usd_prim = self._stage.GetPrimAtPath(read_lidar_og_path)
+    #     usd_prim.GetRelationship("inputs:lidarPrim").AddTarget(lidar_prim_path)
+    #     print(f"[+] Created {graph_path}")
+
     def _setup_lidar_graph(self, keys, is_front_lidar: bool):
         if is_front_lidar:
             lidar_num = 1
@@ -299,6 +359,7 @@ class KMRLoader(BaseSample):
             lidar_frame_id = "kmr_laser_B4_link"
 
         lidar_prim_path = f"{self._kmr_prim}/{lidar_frame_id}/Lidar"
+        # graph_path = f"{self._og_scope_prim_path}/lidar{lidar_num}_graph"
         graph_path = f"/lidar{lidar_num}_graph"
         og.Controller.edit(
             {"graph_path": graph_path, "evaluator_name": "execution"},
@@ -312,6 +373,9 @@ class KMRLoader(BaseSample):
                     ("ros2_pub_laser_scan", "omni.isaac.ros2_bridge.ROS2PublishLaserScan"),
                 ],
                 keys.SET_VALUES: [
+                    # (f"{graph_path}/ros2_pub_laser_scan.inputs:topicName", f"/laser_scan{lidar_num}"),
+                    # (f"{graph_path}/constant_string_frame_id.inputs:value", lidar_frame_id),
+                    # (f"{graph_path}/ros2_context.outputs:context", 0),
                     ("ros2_pub_laser_scan.inputs:topicName", f"/laser_scan{lidar_num}"),
                     ("constant_string_frame_id.inputs:value", lidar_frame_id),
                     ("ros2_context.outputs:context", 0),
@@ -341,7 +405,7 @@ class KMRLoader(BaseSample):
 
     def _setup_tf_graph(self, keys):
         # TODO: Check that tf publishes as intended
-        graph_path = "/tf_pub_graph"
+        graph_path = f"{self._og_scope_prim_path}/tf_pub_graph"
         og.Controller.edit(
             {"graph_path": graph_path, "evaluator_name": "execution"},
             {
@@ -377,7 +441,7 @@ class KMRLoader(BaseSample):
 
     def _setup_odom_graph(self, keys):
         # TODO!: Not connected to wheels!!!
-        graph_path = "/odom_pub_graph"
+        graph_path = f"{self._og_scope_prim_path}/odom_pub_graph"
         og.Controller.edit(
             {"graph_path": graph_path, "evaluator_name": "execution"},
             {
@@ -418,7 +482,7 @@ class KMRLoader(BaseSample):
         print(f"[+] Created {graph_path}")
 
     def _setup_camera_graph(self, keys):
-        graph_path = "/camera_pub_graph"
+        graph_path = f"{self._og_scope_prim_path}/camera_pub_graph"
         og.Controller.edit(
             {"graph_path": graph_path, "evaluator_name": "execution"},
             {

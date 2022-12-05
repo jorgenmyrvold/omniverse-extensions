@@ -20,7 +20,7 @@ class KMRLoaderExtension(BaseSampleExtension):
             number_of_extra_frames=1,
         )
 
-        self.environment = "Grid/default_environment"
+        self.environment = "Simple_Warehouse/warehouse_with_forklifts"
         self.robot = "KMR"
         
         self.ui_elements = {}
@@ -37,7 +37,7 @@ class KMRLoaderExtension(BaseSampleExtension):
                 self.ui_elements["Environment"] = dropdown_builder(
                     label="Environment",
                     items=["Grid/default_environment", "Simple_Warehouse/warehouse_with_forklifts", "Simple_Warehouse/warehouse_multiple_shelves"],
-                    default_val=0,
+                    default_val=1,
                     on_clicked_fn=lambda env: self.sample.on_select_environment(env),
                     tooltip="Select environment",
                 )
