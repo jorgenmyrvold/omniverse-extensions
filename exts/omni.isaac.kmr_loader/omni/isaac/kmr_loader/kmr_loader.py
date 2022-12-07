@@ -12,6 +12,7 @@ ENVIRONMENT_BASE_PATH = "omniverse://localhost/NVIDIA/Assets/Isaac/2022.1/Isaac/
 KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr_wo_wheels.urdf"
 OMNIWHEELS_PATH = "/home/jorgen/isaac_ws/omniwheels/"
 ROS2_FRAME_ID = "world"
+ROS2_CONTEXT_DOMAIN_ID = 0
 
 
 class KMRLoader(BaseSample):
@@ -39,11 +40,11 @@ class KMRLoader(BaseSample):
         )
 
         res, self._kmr_prim = self._load_kmr()
+        self._stage.SetDefaultPrim(self._stage.GetPrimAtPath(f"{self._kmr_prim}"))
         self._rig_robot()
         self._setup_omnigraphs()
-        self._stage.SetDefaultPrim(self._stage.GetPrimAtPath(f"{self._kmr_prim}"))
-        print("KMR PRIM", self._stage.GetPrimAtPath(self._kmr_prim))
         return
+    
     
     def _load_kmr(self, urdf_filepath=KMR_PATH):
         import_config = _urdf.ImportConfig()
@@ -122,13 +123,13 @@ class KMRLoader(BaseSample):
             prim_path=joint_scope_prim_path,
         )
 
-        omniwheels = {"omniwheel_fl": "front_left", 
-                      "omniwheel_fr": "front_right", 
-                      "omniwheel_rl": "back_left",
-                      "omniwheel_rr": "back_right"}
+        omniwheels = {"omniwheel_fl": "wheel_fl", 
+                      "omniwheel_fr": "wheel_fr", 
+                      "omniwheel_rl": "wheel_rl",
+                      "omniwheel_rr": "wheel_rr"}
 
-        for prim_name, wheel in omniwheels.items():
-            omniwheel_prim_path = f"{self._kmr_prim}/{prim_name}"
+        for prim_name, wheel_name in omniwheels.items():
+            omniwheel_prim_path = f"{self._kmr_prim}/{wheel_name}"
             omniwheel_prim = self._stage.DefinePrim(omniwheel_prim_path)
             omni.kit.commands.execute("AddReference",
                 stage=self._stage,
@@ -169,7 +170,7 @@ class KMRLoader(BaseSample):
 
             omni.kit.commands.execute("MovePrim",
                 path_from=joint_prim.GetPrimPath(),
-                path_to=f"{joint_scope_prim_path}/{prim_name}_joint"
+                path_to=f"{joint_scope_prim_path}/{wheel_name}_joint"
             )
 
         print("[+] Created omniwheels")
@@ -193,25 +194,26 @@ class KMRLoader(BaseSample):
 
 
     def _setup_omnigraphs(self):
-        # self._og_scope_prim_path = f"{self._kmr_prim}/omnigraphs"
-        # omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
-        #     prim_type="Scope",
-        #     prim_path=self._og_scope_prim_path,
-        # )
-
+        self._og_scope_prim_path = f"{self._kmr_prim}/omnigraphs"
+        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
+            prim_type="Scope",
+            prim_path=self._og_scope_prim_path,
+        )
+  
         keys = og.Controller.Keys
         # self._setup_kmp_graph(keys)
         # self._setup_iiwa_graph(keys)
         self._setup_lidar_graph(keys, is_front_lidar=True)
-        # self._setup_lidar_graph(keys, is_front_lidar=False)
-        # self._setup_tf_graph(keys)
+        self._setup_lidar_graph(keys, is_front_lidar=False)
+        self._setup_tf_graph(keys)
         # self._setup_odom_graph(keys)
         # self._setup_camera_graph(keys)
         return
     
     def _setup_kmp_graph(self, keys):
         # TODO: Not checked that the robot actually moves 
-        graph_prim_path = f"{self._og_scope_prim_path}/kmp_controller_graph"
+        # graph_prim_path = f"{self._og_scope_prim_path}/kmp_controller_graph"
+        graph_prim_path = "/kmp_controller_graph"
         og.Controller.edit(
             {"graph_path": graph_prim_path, "evaluator_name": "execution"},
             {
@@ -219,40 +221,40 @@ class KMRLoader(BaseSample):
                     ("on_playback_tick", "omni.graph.action.OnPlaybackTick"),
                     ("constant_token_FR", "omni.graph.nodes.ConstantToken"), # Front Right etc...
                     ("constant_token_FL", "omni.graph.nodes.ConstantToken"),
-                    ("constant_token_BR", "omni.graph.nodes.ConstantToken"),
-                    ("constant_token_BL", "omni.graph.nodes.ConstantToken"),
+                    ("constant_token_RR", "omni.graph.nodes.ConstantToken"),
+                    ("constant_token_RL", "omni.graph.nodes.ConstantToken"),
                     ("constant_double_FR", "omni.graph.nodes.ConstantDouble"),
                     ("constant_double_FL", "omni.graph.nodes.ConstantDouble"),
-                    ("constant_double_BR", "omni.graph.nodes.ConstantDouble"),
-                    ("constant_double_BL", "omni.graph.nodes.ConstantDouble"),
+                    ("constant_double_RR", "omni.graph.nodes.ConstantDouble"),
+                    ("constant_double_RL", "omni.graph.nodes.ConstantDouble"),
                     ("make_array_joint_names", "omni.graph.nodes.MakeArray"),
                     ("make_array_joint_vel", "omni.graph.nodes.MakeArray"),
                     ("articulation_controller", "omni.isaac.core_nodes.IsaacArticulationController"),
                 ],
                 keys.SET_VALUES: [
-                    ("constant_token_FR.inputs:value", "kmr_back_left_wheel_joint"),
-                    ("constant_token_FL.inputs:value", "kmr_back_right_wheel_joint"),
-                    ("constant_token_BR.inputs:value", "kmr_front_left_wheel_joint"),
-                    ("constant_token_BL.inputs:value", "kmr_front_right_wheel_joint"),  # forward | sideways
+                    ("constant_token_FR.inputs:value", "wheel_fr_joint"),
+                    ("constant_token_FL.inputs:value", "wheel_fl_joint"),
+                    ("constant_token_RR.inputs:value", "wheel_rr_joint"),
+                    ("constant_token_RL.inputs:value", "wheel_rl_joint"),  # forward | sideways
                     ("constant_double_FR.inputs:value", -5.0),                               # 5       | -5
                     ("constant_double_FL.inputs:value", 5.0),                               # 5       | 5
-                    ("constant_double_BR.inputs:value", 5.0),                               # 5       | 5
-                    ("constant_double_BL.inputs:value", -5.0),                               # 5       | -5
+                    ("constant_double_RR.inputs:value", 5.0),                               # 5       | 5
+                    ("constant_double_RL.inputs:value", -5.0),                               # 5       | -5
                     ("make_array_joint_names.inputs:arraySize", 4),
                     ("make_array_joint_vel.inputs:arraySize", 4),
                     # ("articulation_controller.inputs:robotPath", self._kmr_prim),
-                    # ("articulation_controller.inputs:usePath", True),
+                    ("articulation_controller.inputs:usePath", False),
                 ],
                 keys.CONNECT: [
                     ("on_playback_tick.outputs:tick", "articulation_controller.inputs:execIn"),
                     ("constant_token_FR.inputs:value", "make_array_joint_names.inputs:a"),
                     ("constant_token_FL.inputs:value", "make_array_joint_names.inputs:b"),
-                    ("constant_token_BR.inputs:value", "make_array_joint_names.inputs:c"),
-                    ("constant_token_BL.inputs:value", "make_array_joint_names.inputs:d"),
+                    ("constant_token_RR.inputs:value", "make_array_joint_names.inputs:c"),
+                    ("constant_token_RL.inputs:value", "make_array_joint_names.inputs:d"),
                     ("constant_double_FR.inputs:value", "make_array_joint_vel.inputs:a"),
                     ("constant_double_FL.inputs:value", "make_array_joint_vel.inputs:b"),
-                    ("constant_double_BR.inputs:value", "make_array_joint_vel.inputs:c"),
-                    ("constant_double_BL.inputs:value", "make_array_joint_vel.inputs:d"),
+                    ("constant_double_RR.inputs:value", "make_array_joint_vel.inputs:c"),
+                    ("constant_double_RL.inputs:value", "make_array_joint_vel.inputs:d"),
                     ("make_array_joint_names.outputs:array", "articulation_controller.inputs:jointNames"),
                     ("make_array_joint_vel.outputs:array", "articulation_controller.inputs:velocityCommand"),
                 ]
@@ -299,57 +301,6 @@ class KMRLoader(BaseSample):
         set_target_prims(primPath=f"{graph_prim_path}/PublishJointState", targetPrimPaths=[self._kmr_prim])
         print(f"[+] Created {graph_prim_path}")
 
-    # Original lidar graph. Causes isaac sim to crash when called...
-    # def _setup_lidar_graph(self, keys, is_front_lidar: bool):
-    #     if is_front_lidar:
-    #         lidar_num = 1
-    #         lidar_frame_id = "kmriiwa_laser_B1_link"
-    #     else:
-    #         lidar_num = 2
-    #         lidar_frame_id = "kmriiwa_laser_B4_link"
-
-    #     lidar_prim_path = f"{self._kmr_prim}/{lidar_frame_id}/Lidar"
-    #     graph_path = f"/lidar{lidar_num}_graph"
-    #     og.Controller.edit(
-    #         {"graph_path": graph_path, "evaluator_name": "execution"},
-    #         {
-    #             keys.CREATE_NODES: [
-    #                 ("on_playback_tick", "omni.graph.action.OnPlaybackTick"),
-    #                 ("isaac_read_lidar_beam_node", "omni.isaac.range_sensor.IsaacReadLidarBeams"),
-    #                 ("ros2_context", "omni.isaac.ros2_bridge.ROS2Context"),
-    #                 ("constant_string_frame_id", "omni.graph.nodes.ConstantString"),
-    #                 ("isaac_read_sim_time", "omni.isaac.core_nodes.IsaacReadSimulationTime"),
-    #                 ("ros2_pub_laser_scan", "omni.isaac.ros2_bridge.ROS2PublishLaserScan"),
-    #             ],
-    #             keys.SET_VALUES: [
-    #                 ("ros2_pub_laser_scan.inputs:topicName", f"/laser_scan{lidar_num}"),
-    #                 ("constant_string_frame_id.inputs:value", lidar_frame_id),
-    #                 ("ros2_context.outputs:context", 0),
-    #             ],
-    #             keys.CONNECT: [
-    #                 ("on_playback_tick.outputs:tick", "isaac_read_lidar_beam_node.inputs:execIn"),
-    #                 ("isaac_read_lidar_beam_node.outputs:execOut", "ros2_pub_laser_scan.inputs:execIn"),
-    #                 ("isaac_read_lidar_beam_node.outputs:azimuthRange", "ros2_pub_laser_scan.inputs:azimuthRange"),
-    #                 ("isaac_read_lidar_beam_node.outputs:depthRange", "ros2_pub_laser_scan.inputs:depthRange"),
-    #                 ("isaac_read_lidar_beam_node.outputs:horizontalFov", "ros2_pub_laser_scan.inputs:horizontalFov"),
-    #                 ("isaac_read_lidar_beam_node.outputs:horizontalResolution", "ros2_pub_laser_scan.inputs:horizontalResolution"),
-    #                 ("isaac_read_lidar_beam_node.outputs:intensitiesData", "ros2_pub_laser_scan.inputs:intensitiesData"),
-    #                 ("isaac_read_lidar_beam_node.outputs:linearDepthData", "ros2_pub_laser_scan.inputs:linearDepthData"),
-    #                 ("isaac_read_lidar_beam_node.outputs:numCols", "ros2_pub_laser_scan.inputs:numCols"),
-    #                 ("isaac_read_lidar_beam_node.outputs:numRows", "ros2_pub_laser_scan.inputs:numRows"),
-    #                 ("isaac_read_lidar_beam_node.outputs:rotationRate", "ros2_pub_laser_scan.inputs:rotationRate"),
-    #                 ("ros2_context.outputs:context", "ros2_pub_laser_scan.inputs:context"),
-    #                 ("constant_string_frame_id.inputs:value", "ros2_pub_laser_scan.inputs:frameId"),
-    #                 ("isaac_read_sim_time.outputs:simulationTime", "ros2_pub_laser_scan.inputs:timeStamp"),
-    #             ],
-    #         }
-    #     )
-        
-    #     read_lidar_og_path = f"{graph_path}/isaac_read_lidar_beam_node"
-    #     usd_prim = self._stage.GetPrimAtPath(read_lidar_og_path)
-    #     usd_prim.GetRelationship("inputs:lidarPrim").AddTarget(lidar_prim_path)
-    #     print(f"[+] Created {graph_path}")
-
     def _setup_lidar_graph(self, keys, is_front_lidar: bool):
         if is_front_lidar:
             lidar_num = 1
@@ -359,8 +310,7 @@ class KMRLoader(BaseSample):
             lidar_frame_id = "kmr_laser_B4_link"
 
         lidar_prim_path = f"{self._kmr_prim}/{lidar_frame_id}/Lidar"
-        # graph_path = f"{self._og_scope_prim_path}/lidar{lidar_num}_graph"
-        graph_path = f"/lidar{lidar_num}_graph"
+        graph_path = f"{self._og_scope_prim_path}/lidar{lidar_num}_graph"
         og.Controller.edit(
             {"graph_path": graph_path, "evaluator_name": "execution"},
             {
@@ -368,17 +318,13 @@ class KMRLoader(BaseSample):
                     ("on_playback_tick", "omni.graph.action.OnPlaybackTick"),
                     ("isaac_read_lidar_beam_node", "omni.isaac.range_sensor.IsaacReadLidarBeams"),
                     ("ros2_context", "omni.isaac.ros2_bridge.ROS2Context"),
-                    ("constant_string_frame_id", "omni.graph.nodes.ConstantString"),
                     ("isaac_read_sim_time", "omni.isaac.core_nodes.IsaacReadSimulationTime"),
                     ("ros2_pub_laser_scan", "omni.isaac.ros2_bridge.ROS2PublishLaserScan"),
                 ],
                 keys.SET_VALUES: [
-                    # (f"{graph_path}/ros2_pub_laser_scan.inputs:topicName", f"/laser_scan{lidar_num}"),
-                    # (f"{graph_path}/constant_string_frame_id.inputs:value", lidar_frame_id),
-                    # (f"{graph_path}/ros2_context.outputs:context", 0),
                     ("ros2_pub_laser_scan.inputs:topicName", f"/laser_scan{lidar_num}"),
-                    ("constant_string_frame_id.inputs:value", lidar_frame_id),
-                    ("ros2_context.outputs:context", 0),
+                    ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
+                    ("ros2_pub_laser_scan.inputs:frameId", lidar_frame_id),
                 ],
                 keys.CONNECT: [
                     ("on_playback_tick.outputs:tick", "isaac_read_lidar_beam_node.inputs:execIn"),
@@ -393,7 +339,6 @@ class KMRLoader(BaseSample):
                     ("isaac_read_lidar_beam_node.outputs:numRows", "ros2_pub_laser_scan.inputs:numRows"),
                     ("isaac_read_lidar_beam_node.outputs:rotationRate", "ros2_pub_laser_scan.inputs:rotationRate"),
                     ("ros2_context.outputs:context", "ros2_pub_laser_scan.inputs:context"),
-                    ("constant_string_frame_id.inputs:value", "ros2_pub_laser_scan.inputs:frameId"),
                     ("isaac_read_sim_time.outputs:simulationTime", "ros2_pub_laser_scan.inputs:timeStamp"),
                 ],
             }
@@ -416,7 +361,7 @@ class KMRLoader(BaseSample):
                     ("ros2_pub_tf", "omni.isaac.ros2_bridge.ROS2PublishTransformTree")
                 ],
                 keys.SET_VALUES: [
-                    ("ros2_context.outputs:context", 0),
+                    ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
                 ],
                 keys.CONNECT: [
                     ("on_playback_tick.outputs:tick", "ros2_pub_tf.inputs:execIn"),
@@ -454,7 +399,7 @@ class KMRLoader(BaseSample):
                     ("ros2_pub_raw_tf", "omni.isaac.ros2_bridge.ROS2PublishRawTransformTree"),
                 ],
                 keys.SET_VALUES: [
-                    ("ros2_context.outputs:context", 0),
+                    ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
                     ("ros2_pub_raw_tf.inputs:topicName", "tf_raw"),
                 ],
                 keys.CONNECT: [
@@ -500,7 +445,7 @@ class KMRLoader(BaseSample):
                 ],
                 keys.SET_VALUES: [
                     ("viewport_id.inputs:value", 0),  # UNIQUE
-                    ("ros2_context.outputs:context", 0),
+                    ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
                     ("frame_id.inputs:value", ROS2_FRAME_ID),
                     ("set_active_camera.inputs:primPath", "/World/Camera_1"),
                     ("ros2_camera_helper_rgb.inputs:type", "rgb"),
