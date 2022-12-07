@@ -176,10 +176,11 @@ class KMRLoader(BaseSample):
         print("[+] Created omniwheels")
 
     def _create_cameras(self):
-        camera_prefixes = ["camera_front", "camera_left", "camera_right", "camera_manipulator"]
-        for camera in camera_prefixes:
+        camera_suffixes = ["front", "manipulator", "right", "left"]
+        self._camera_prim_paths = {}
+        for camera in camera_suffixes:
             frame = "link"  # Which frame to mount the camera to
-            prim_path = f"{self._kmr_prim}/{camera}_{frame}/{camera}"
+            prim_path = f"{self._kmr_prim}/camera_{camera}_{frame}/camera_{camera}"
             omni.kit.commands.execute("CreatePrimWithDefaultXform",
                 prim_type="Camera",
                 prim_path=prim_path,
@@ -190,7 +191,8 @@ class KMRLoader(BaseSample):
                 value=(0.5, 0.5, -0.5, -0.5),
                 prev=(0.5, 0.5, 0.5, 0.5)
             )
-            print(f"[+] Created {camera}")
+            self._camera_prim_paths[prim_path] = camera
+            print(f"[+] Created {prim_path}")
 
 
     def _setup_omnigraphs(self):
@@ -207,7 +209,10 @@ class KMRLoader(BaseSample):
         self._setup_lidar_graph(keys, is_front_lidar=False)
         self._setup_tf_graph(keys)
         # self._setup_odom_graph(keys)
-        # self._setup_camera_graph(keys)
+        for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
+            print("++++ GRAPH", viewport_id, camera_prim_path, topic_suffix)
+            self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)
+        # self._setup_camera_graph(keys, "/kmr/camera_front_link/camera_front", "front" ,0)
         return
     
     def _setup_kmp_graph(self, keys):
@@ -426,8 +431,8 @@ class KMRLoader(BaseSample):
         
         print(f"[+] Created {graph_path}")
 
-    def _setup_camera_graph(self, keys):
-        graph_path = f"{self._og_scope_prim_path}/camera_pub_graph"
+    def _setup_camera_graph(self, keys, camera_prim_path, topic_suffix, viewport_id):
+        graph_path = f"{self._og_scope_prim_path}/camera_{topic_suffix}_pub_graph"
         og.Controller.edit(
             {"graph_path": graph_path, "evaluator_name": "execution"},
             {
@@ -444,16 +449,16 @@ class KMRLoader(BaseSample):
                     ("ros2_context", "omni.isaac.ros2_bridge.ROS2Context"),
                 ],
                 keys.SET_VALUES: [
-                    ("viewport_id.inputs:value", 0),  # UNIQUE
+                    ("viewport_id.inputs:value", viewport_id),  # UNIQUE
                     ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
-                    ("frame_id.inputs:value", ROS2_FRAME_ID),
-                    ("set_active_camera.inputs:primPath", "/World/Camera_1"),
+                    ("frame_id.inputs:value", f"camera_{topic_suffix}_link"),  # TODO: "..._link" can be any other frame connected to the camera. Should be able to customize
+                    ("set_active_camera.inputs:primPath", camera_prim_path),
                     ("ros2_camera_helper_rgb.inputs:type", "rgb"),
-                    ("ros2_camera_helper_rgb.inputs:topicName", "rgb"),
+                    ("ros2_camera_helper_rgb.inputs:topicName", f"rgb_{topic_suffix}"),
                     ("ros2_camera_helper_info.inputs:type", "camera_info"),
-                    ("ros2_camera_helper_info.inputs:topicName", "camera_info"),
+                    ("ros2_camera_helper_info.inputs:topicName", f"camera_info"),
                     ("ros2_camera_helper_depth.inputs:type", "depth"),
-                    ("ros2_camera_helper_depth.inputs:topicName", "depth"),
+                    ("ros2_camera_helper_depth.inputs:topicName", f"depth_{topic_suffix}"),
                 ],
                 keys.CONNECT: [
                     ("on_playback_tick.outputs:tick", "isaac_create_viewport.inputs:execIn"),
