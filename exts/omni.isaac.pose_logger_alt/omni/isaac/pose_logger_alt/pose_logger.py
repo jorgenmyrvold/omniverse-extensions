@@ -45,9 +45,6 @@ class PoseLogger:
     
     def step_manually(self):
         self.get_world().step_async()
-    
-    def play_sim(self):
-        asyncio.ensure_future(self.get_world().play_async())
 
     def on_save_data_event(self, log_path):
         world = self.get_world()
@@ -57,12 +54,3 @@ class PoseLogger:
         data_logger.reset()
         print("Datalogger reset")
         return
-
-    
-
-    def print_pose(self):
-        curr_prim = self.stage.GetPrimAtPath(self.target_prim_path)
-        timecode = self.timeline.get_current_time() * self.timeline.get_time_codes_per_seconds()
-        pose = omni.usd.utils.get_world_transform_matrix(curr_prim, timecode)
-        print("Matrix:", pose)
-        print("Translation:", pose.ExtractTranslation())

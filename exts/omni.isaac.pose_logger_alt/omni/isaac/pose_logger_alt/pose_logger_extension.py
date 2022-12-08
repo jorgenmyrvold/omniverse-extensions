@@ -52,17 +52,12 @@ class PoseLoggerExtension(omni.ext.IExt):
                     on_clicked_fn=self.on_save_log_event,
                 )
                 
-                self.ui_elements['Print pose button'] = btn_builder(
-                    label='step',
+                self.ui_elements['Step button'] = btn_builder(
+                    label='Step World',
                     text='step',
                     on_clicked_fn=self.pose_logger.step_manually,
                 )
 
-                self.ui_elements['Play sim'] = btn_builder(
-                    label='Play sim',
-                    text='play sim',
-                    on_clicked_fn=self.pose_logger.play_sim,
-                )
         
     def load_world(self):
         async def load_world_async():
