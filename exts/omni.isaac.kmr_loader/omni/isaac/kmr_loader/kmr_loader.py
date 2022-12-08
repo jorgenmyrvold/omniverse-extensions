@@ -10,7 +10,8 @@ from omni.isaac.urdf import _urdf
 ENVIRONMENT_BASE_PATH = "omniverse://localhost/NVIDIA/Assets/Isaac/2022.1/Isaac/Environments/"
 # KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr.urdf"
 KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr_wo_wheels.urdf"
-OMNIWHEELS_PATH = "/home/jorgen/isaac_ws/omniwheels/"
+# OMNIWHEELS_PATH = "/home/jorgen/isaac_ws/omniwheels/"
+OMNIWHEELS_PATH = "/home/jorgen/misc_repos/o3dynsimmodel/Parts/"
 ROS2_FRAME_ID = "world"
 ROS2_CONTEXT_DOMAIN_ID = 0
 
@@ -42,7 +43,7 @@ class KMRLoader(BaseSample):
         res, self._kmr_prim = self._load_kmr()
         self._stage.SetDefaultPrim(self._stage.GetPrimAtPath(f"{self._kmr_prim}"))
         self._rig_robot()
-        self._setup_omnigraphs()
+        # self._setup_omnigraphs()
         return
     
     
@@ -111,11 +112,17 @@ class KMRLoader(BaseSample):
         return result, prim
 
     def _load_omniwheels(self, omniwheels_path=OMNIWHEELS_PATH):
-        # TODO: Check how the omniwheel usd files are saved.
+        # TODO: Left wheels have correct rotation direction. Right wheels have to be reversed
         """
         omnisheels_path should point to the directory where the four omniwheels with names
         omniwheel_fl.usd, omniwheel_fr.usd, omniwheel_rl.usd, omniwheel_rr.usd
         """
+        # Create scope to place the omniwheels in
+        omniwheel_scope_prim_path = f"{self._kmr_prim}/omniwheel"
+        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
+            prim_type="Scope",
+            prim_path=omniwheel_scope_prim_path,
+        )
         # Create scope to place the omniwheel joints in
         joint_scope_prim_path = f"{self._kmr_prim}/omniwheel_joints"
         omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
@@ -123,56 +130,63 @@ class KMRLoader(BaseSample):
             prim_path=joint_scope_prim_path,
         )
 
-        omniwheels = {"omniwheel_fl": "wheel_fl", 
-                      "omniwheel_fr": "wheel_fr", 
-                      "omniwheel_rl": "wheel_rl",
-                      "omniwheel_rr": "wheel_rr"}
+        omniwheels = {"omniwheel_fl": "wheel_left", 
+                      "omniwheel_fr": "wheel_right", 
+                      "omniwheel_rl": "wheel_right",
+                      "omniwheel_rr": "wheel_left"}
 
-        for prim_name, wheel_name in omniwheels.items():
-            omniwheel_prim_path = f"{self._kmr_prim}/{wheel_name}"
-            omniwheel_prim = self._stage.DefinePrim(omniwheel_prim_path)
-            omni.kit.commands.execute("AddReference",
-                stage=self._stage,
-                prim_path=Sdf.Path(omniwheel_prim_path),
-                reference=Sdf.Reference(f"{omniwheels_path}/{prim_name}.usd")
+        for prim_name, file_name in omniwheels.items():
+            omniwheel_prim_path = f"{omniwheel_scope_prim_path}/{prim_name}"
+            omni.kit.commands.execute("CreateReference",
+                usd_context=omni.usd.get_context(),
+                path_to=omniwheel_prim_path,
+                asset_path=f"{omniwheels_path}/{file_name}.usd",   
             )
-            
+            omniwheel_prim = self._stage.GetPrimAtPath(omniwheel_prim_path)
+
+            xform = UsdGeom.Xformable(omniwheel_prim)
+            xform.ClearXformOpOrder()
             if prim_name[-2:] == "fl":
-                UsdGeom.Xformable(omniwheel_prim).AddTranslateOp().Set((0.28, 0.4825, 0.17))  # Should be 0.28, 0.1825, 0.125
-                UsdGeom.Xformable(omniwheel_prim).AddRotateXYZOp().Set((0, 0, -90))
+                UsdGeom.Xformable(omniwheel_prim).AddTranslateOp().Set((0.28, 0.1825, 0.125))  # Should be 0.28, 0.1825, 0.125
+                UsdGeom.Xformable(omniwheel_prim).AddRotateXYZOp().Set((0, 0, 90))
             elif prim_name[-2:] == "fr":
-                UsdGeom.Xformable(omniwheel_prim).AddTranslateOp().Set((0.28, -0.4825, 0.17))
-                UsdGeom.Xformable(omniwheel_prim).AddRotateXYZOp().Set((0, 0, 90))
-            elif prim_name[-2:] == "rl":
-                UsdGeom.Xformable(omniwheel_prim).AddTranslateOp().Set((-0.28, 0.4825, 0.17))
+                UsdGeom.Xformable(omniwheel_prim).AddTranslateOp().Set((0.28, -0.1825, 0.125))
                 UsdGeom.Xformable(omniwheel_prim).AddRotateXYZOp().Set((0, 0, -90))
-            elif prim_name[-2:] == "rr":
-                UsdGeom.Xformable(omniwheel_prim).AddTranslateOp().Set((-0.28, -0.4825, 0.17))
+            elif prim_name[-2:] == "rl":
+                UsdGeom.Xformable(omniwheel_prim).AddTranslateOp().Set((-0.28, 0.1825, 0.125))
                 UsdGeom.Xformable(omniwheel_prim).AddRotateXYZOp().Set((0, 0, 90))
+            elif prim_name[-2:] == "rr":
+                UsdGeom.Xformable(omniwheel_prim).AddTranslateOp().Set((-0.28, -0.1825, 0.125))
+                UsdGeom.Xformable(omniwheel_prim).AddRotateXYZOp().Set((0, 0, -90))
+            UsdGeom.Xformable(omniwheel_prim).AddScaleOp(precision=UsdGeom.XformOp.PrecisionDouble).Set((0.875, 0.875, 0.875))
 
             success, joint_prim = omni.kit.commands.execute("CreateJointCommand",
                 stage=self._stage,
                 joint_type="Revolute",
                 from_prim=self._stage.GetPrimAtPath(f"{self._kmr_prim}/kmr_base_link"),
-                to_prim=self._stage.GetPrimAtPath(f"{omniwheel_prim_path}/{prim_name}/omniwheel")
+                to_prim=self._stage.GetPrimAtPath(f"{omniwheel_prim_path}/omniwheel")
             )
+            # Joints on right side have to be rotated 180 deg around z-axis so that positive angular drive corresponds to positive velocity
+            if prim_name[-1:] == "r": 
+                omni.kit.commands.execute("ChangeProperty",
+                    prop_path=f"{joint_prim.GetPrimPath()}.physics:localRot0",
+                    value=(0.70710677, 0, 0, 0.70710677),
+                    prev=(0.70710677, 0, 0, -0.70710677)
+                )
 
             omni.kit.commands.execute("AddPhysicsComponent",
                 usd_prim=joint_prim,
                 component="PhysicsDrive:angular"
             )
-
             omni.kit.commands.execute("ChangeProperty",
                 prop_path=f"{joint_prim.GetPrimPath()}.drive:angular:physics:damping",
-                value=10_000,  # Random value used in multiple isaac tutorials
+                value=10_000,  # Random value used in multiple isaac tutorials. Has to be non-zero to drive
                 prev=0
             )
-
             omni.kit.commands.execute("MovePrim",
                 path_from=joint_prim.GetPrimPath(),
-                path_to=f"{joint_scope_prim_path}/{wheel_name}_joint"
+                path_to=f"{joint_scope_prim_path}/{prim_name[4:]}_joint"
             )
-
         print("[+] Created omniwheels")
 
     def _create_cameras(self):
@@ -204,15 +218,13 @@ class KMRLoader(BaseSample):
   
         keys = og.Controller.Keys
         # self._setup_kmp_graph(keys)
-        # self._setup_iiwa_graph(keys)
+        self._setup_iiwa_graph(keys)
         self._setup_lidar_graph(keys, is_front_lidar=True)
         self._setup_lidar_graph(keys, is_front_lidar=False)
-        self._setup_tf_graph(keys)
+        # self._setup_tf_graph(keys)
         # self._setup_odom_graph(keys)
-        for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
-            print("++++ GRAPH", viewport_id, camera_prim_path, topic_suffix)
-            self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)
-        # self._setup_camera_graph(keys, "/kmr/camera_front_link/camera_front", "front" ,0)
+        # for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
+        #     self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)
         return
     
     def _setup_kmp_graph(self, keys):
@@ -303,7 +315,7 @@ class KMRLoader(BaseSample):
             },
         )
         # Setting the /panda target prim to Publish JointState node
-        set_target_prims(primPath=f"{graph_prim_path}/PublishJointState", targetPrimPaths=[self._kmr_prim])
+        set_target_prims(primPath=f"{graph_prim_path}/PublishJointState", targetPrimPaths=[f"{self._kmr_prim}"])
         print(f"[+] Created {graph_prim_path}")
 
     def _setup_lidar_graph(self, keys, is_front_lidar: bool):
@@ -384,9 +396,7 @@ class KMRLoader(BaseSample):
         # TODO: Problem with multiple targets
         # usd_prim.GetRelationship("inputs:targetPrims").AddTarget(f"{self._kmr_prim}/kmriiwa_laser_B1_link/Lidar")
         # usd_prim.GetRelationship("inputs:targetPrims").AddTarget(f"{self._kmr_prim}/kmriiwa_laser_B4_link/Lidar")
-        usd_prim.GetRelationship("inputs:targetPrims").AddTarget(self._kmr_prim)
-        # TODO: Add cameras and other relevant sensors
-        
+        usd_prim.GetRelationship("inputs:targetPrims").AddTarget(self._kmr_prim)        
         print(f"[+] Created {graph_path}")
 
     def _setup_odom_graph(self, keys):
