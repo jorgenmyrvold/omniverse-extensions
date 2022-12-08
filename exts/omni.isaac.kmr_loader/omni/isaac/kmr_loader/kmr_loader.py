@@ -43,7 +43,7 @@ class KMRLoader(BaseSample):
         res, self._kmr_prim = self._load_kmr()
         self._stage.SetDefaultPrim(self._stage.GetPrimAtPath(f"{self._kmr_prim}"))
         self._rig_robot()
-        # self._setup_omnigraphs()
+        self._setup_omnigraphs()
         return
     
     
@@ -221,7 +221,7 @@ class KMRLoader(BaseSample):
         self._setup_iiwa_graph(keys)
         self._setup_lidar_graph(keys, is_front_lidar=True)
         self._setup_lidar_graph(keys, is_front_lidar=False)
-        # self._setup_tf_graph(keys)
+        self._setup_tf_graph(keys)
         # self._setup_odom_graph(keys)
         # for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
         #     self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)
