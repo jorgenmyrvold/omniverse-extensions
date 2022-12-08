@@ -58,10 +58,10 @@ class PoseLoggerExtension(omni.ext.IExt):
                     on_clicked_fn=self.pose_logger.step_manually,
                 )
 
-                self.ui_elements['Play sim'] = btn_builder(
-                    label='Play sim',
-                    text='play sim',
-                    on_clicked_fn=self.pose_logger.play_sim,
+                self.ui_elements['Add callback'] = btn_builder(
+                    label='Add callback',
+                    text='Add callback',
+                    on_clicked_fn=self.pose_logger.add_callback,
                 )
         
     def load_world(self):

@@ -7,6 +7,8 @@ class PoseLogger:
         self.stage = omni.usd.get_context().get_stage()
         self.timeline = omni.timeline.get_timeline_interface()
         self.pose = {}
+
+        
         return
     
     def get_world(self):
@@ -58,7 +60,9 @@ class PoseLogger:
         print("Datalogger reset")
         return
 
-    
+    def add_callback(self):
+        world = self.get_world()
+        world.add_physics_callback("my_step", world.step_async)
 
     def print_pose(self):
         curr_prim = self.stage.GetPrimAtPath(self.target_prim_path)
