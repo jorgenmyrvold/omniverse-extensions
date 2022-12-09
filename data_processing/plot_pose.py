@@ -35,11 +35,14 @@ class Preprocessor:
         fig, ax = plt.subplots()
         ax.plot(self.time_data, self.all_wheel_vel)
         ax.set_title("Title")
+
+        fig, ax = plt.subplots()
+        ax.plot(self.x_pos, self.y_pos)
         plt.show()
 
 
 def main():
-    filepath = f'{os.path.dirname(__file__)}/data/output_data7.json'
+    filepath = f'{os.path.dirname(__file__)}/data/output_data11.json'
     p = Preprocessor(filepath)
     p.read_json()
     p.process_data()

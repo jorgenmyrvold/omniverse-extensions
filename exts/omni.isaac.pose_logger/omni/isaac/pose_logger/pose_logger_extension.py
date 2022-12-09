@@ -21,7 +21,7 @@ def generate_datafile_name(filename):
 
 class PoseLoggerExtension(omni.ext.IExt):
     def on_startup(self, ext_id):
-        self.load_world()
+        # self.load_world()
         self.pose_logger = PoseLogger()  # Logic part of extension
         self.ui_elements = {}
 
@@ -33,7 +33,7 @@ class PoseLoggerExtension(omni.ext.IExt):
                     file_path=os.path.abspath(__file__),
                     title="Pose logger",
                 )
-
+                
                 self.ui_elements['Target prim path'] = str_builder(
                     label='Target prim path',
                     default_val="/Root/base_link",
@@ -43,54 +43,38 @@ class PoseLoggerExtension(omni.ext.IExt):
                     label="Output filename",
                     default_val="output_data",
                 )
-
-                self.ui_elements['Restart logger button'] = btn_builder(
-                    label='Restart logger',
-                    text="Restart logger",
-                    on_clicked_fn=self.pose_logger.on_restart_data_logger,
+                self.ui_elements['Initialize button'] = btn_builder(
+                    label='Initialize datalogger',
+                    text='Initialize',
+                    on_clicked_fn=self.on_initialize_event,
                 )
-
-                self.ui_elements['Start logging button'] = state_btn_builder(
+                self.ui_elements['Logging button'] = btn_builder(
                     label='Start logging',
-                    a_text="Start logging",
-                    b_text="Pause logging",
-                    on_clicked_fn=self.on_logging_event,
+                    text="Start",
+                    on_clicked_fn=self.on_start_logging_event,
                 )
+                self.ui_elements['Logging button'].enabled = False
 
                 self.ui_elements['Save log button'] = btn_builder(
                     label='Save log',
                     text="Save Log",
                     on_clicked_fn=self.on_save_log_event,
                 )
-                
-                self.ui_elements['Print button'] = btn_builder(
-                    label='Print Pose',
-                    text='Print Pose',
-                    on_clicked_fn=self.pose_logger.print_pose,
-                )
+                self.ui_elements['Save log button'].enabled = False
 
-                self.ui_elements['Add callback'] = btn_builder(
-                    label='Add callback',
-                    text='Add callback',
-                    on_clicked_fn=self.pose_logger.add_callback,
-                )
         
-    def load_world(self):
-        async def load_world_async():
-            world_settings = {"physics_dt": 1.0 / 60.0, "stage_units_in_meters": 1.0, "rendering_dt": 1.0 / 60.0}
-            if World.instance() is None:
-                self._world = World(**world_settings)
-                await self._world.initialize_simulation_context_async()
-            else:
-                self._world = World.instance()
-            
-        asyncio.ensure_future(load_world_async())
-        return
-
-    def on_logging_event(self, val):
+    def on_initialize_event(self):
+        self.pose_logger.load_world()
         self.pose_logger.set_target_prim_path(self.ui_elements['Target prim path'].get_value_as_string())
-        self.pose_logger.on_logging_event(val)
+        self.ui_elements['Logging button'].enabled = True
+        print('[+] Initialized')
+        
+
+    def on_start_logging_event(self):
+        self.pose_logger.on_start_logging_event()
+        self.ui_elements['Save log button'].enabled = True
     
+
     def on_save_log_event(self):
         path = generate_datafile_name(self.ui_elements['Log output dir'].get_value_as_string())
         self.pose_logger.on_save_data_event(path)
