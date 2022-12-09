@@ -1,166 +1,99 @@
 import os
+import omni.ext
 import omni.ui as ui
-from omni.isaac.examples.base_sample import BaseSampleExtension
-from omni.isaac.pose_logger import PoseLogger
-from omni.isaac.ui.ui_utils import get_style, dropdown_builder, btn_builder, str_builder, state_btn_builder
+from omni.isaac.pose_logger.pose_logger import PoseLogger
+from omni.isaac.ui.ui_utils import setup_ui_headers, str_builder, btn_builder, state_btn_builder
+from omni.isaac.core import World
+import asyncio
 
 
-class PoseLoggerExtension(BaseSampleExtension):
-    def on_startup(self, ext_id: str):
-        super().on_startup(ext_id)
-        super().start_extension(
-            menu_name="",
-            submenu_name="",
-            name="Pose logger",
-            title="Pose logger example standalone",
-            doc_link="",
-            overview="Pose logger extension",
-            file_path=os.path.abspath(__file__),
-            sample=PoseLogger(),
-            number_of_extra_frames=2,
-        )
-        self.environment = "Grid/default_environment"
-        self.robot = "KMR"
-        
+DATAFILE_PATH = "/home/jorgen/omniverse-extensions/data_processing/data/"
+
+def generate_datafile_name(filename):
+    path = f"{DATAFILE_PATH}{filename}"
+    path_str_len = len(path)
+    id = 0
+    while os.path.exists(path + ".json"):
+        id += 1
+        path = path[:path_str_len] + str(id)
+    return path + ".json"
+
+
+class PoseLoggerExtension(omni.ext.IExt):
+    def on_startup(self, ext_id):
+        self.load_world()
+        self.pose_logger = PoseLogger()  # Logic part of extension
         self.ui_elements = {}
-        frame = self.get_frame(index=0)
-        self._build_config_ui(frame)
-        frame = self.get_frame(index=1)
-        # self.build_data_logging_ui(frame)
-        self.build_data_logging_ui_new(frame)
-        return
 
-
-    def _build_config_ui(self, frame):
-        with frame:
-            with ui.VStack(style=get_style(), spacing=5, height=0):
-                frame.title = "Configuration"
-                frame.visible = True
-
-                self.ui_elements["Environment"] = dropdown_builder(
-                    label="Environment",
-                    items=["Grid/default_environment", "Simple_Warehouse/warehouse_with_forklifts", "Simple_Warehouse/warehouse_multiple_shelves"],
-                    default_val=0,
-                    on_clicked_fn=lambda env: self.sample.on_select_environment(env),
-                    tooltip="Select environment",
+        self._window = ui.Window("Pose logger", width=300, height=300)
+        with self._window.frame:
+            with ui.VStack(spacing=5, height=0):
+                setup_ui_headers(
+                    ext_id=ext_id,
+                    file_path=os.path.abspath(__file__),
+                    title="Pose logger",
                 )
 
-                self.ui_elements["Robot"] = dropdown_builder(
-                    label="Robot",
-                    items=["KMR", "O3dyn", "Holonomic Dummy"],
-                    default_val=0,
-                    on_clicked_fn=lambda robot: self.sample.on_select_robot(robot),
-                    tooltip="Select Robot",
+                self.ui_elements['Target prim path'] = str_builder(
+                    label='Target prim path',
+                    default_val="/Root/base_link",
                 )
 
-                dict = {
-                    "label": "Change config",
-                    "type": "button",
-                    "text": "Change config",
-                    "tooltip": "Change configuration",
-                    "on_clicked_fn": self.sample._on_change_config_event,
-                }
-                self.ui_elements["Change config"] = btn_builder(**dict)
-                self.ui_elements["Change config"].enabled = True
+                self.ui_elements['Log output dir'] = str_builder(
+                    label="Output filename",
+                    default_val="output_data",
+                )
 
+                self.ui_elements['Restart logger button'] = btn_builder(
+                    label='Restart logger',
+                    text="Restart logger",
+                    on_clicked_fn=self.pose_logger.on_restart_data_logger,
+                )
 
-    def _on_logging_button_event(self, val):
-        self.sample._on_logging_event(val)
-        self.ui_elements["Save Data"].enabled = True
+                self.ui_elements['Start logging button'] = state_btn_builder(
+                    label='Start logging',
+                    a_text="Start logging",
+                    b_text="Pause logging",
+                    on_clicked_fn=self.on_logging_event,
+                )
+
+                self.ui_elements['Save log button'] = btn_builder(
+                    label='Save log',
+                    text="Save Log",
+                    on_clicked_fn=self.on_save_log_event,
+                )
+                
+                self.ui_elements['Print button'] = btn_builder(
+                    label='Print Pose',
+                    text='Print Pose',
+                    on_clicked_fn=self.pose_logger.print_pose,
+                )
+
+                self.ui_elements['Add callback'] = btn_builder(
+                    label='Add callback',
+                    text='Add callback',
+                    on_clicked_fn=self.pose_logger.add_callback,
+                )
+        
+    def load_world(self):
+        async def load_world_async():
+            world_settings = {"physics_dt": 1.0 / 60.0, "stage_units_in_meters": 1.0, "rendering_dt": 1.0 / 60.0}
+            if World.instance() is None:
+                self._world = World(**world_settings)
+                await self._world.initialize_simulation_context_async()
+            else:
+                self._world = World.instance()
+            
+        asyncio.ensure_future(load_world_async())
         return
+
+    def on_logging_event(self, val):
+        self.pose_logger.set_target_prim_path(self.ui_elements['Target prim path'].get_value_as_string())
+        self.pose_logger.on_logging_event(val)
     
-    def _on_save_data_button_event(self):
-        self.sample._on_save_data_event(self.ui_elements["Output Directory"].get_value_as_string())
-        return
+    def on_save_log_event(self):
+        path = generate_datafile_name(self.ui_elements['Log output dir'].get_value_as_string())
+        self.pose_logger.on_save_data_event(path)
 
-    def build_data_logging_ui(self, frame):
-        with frame:
-            with ui.VStack(spacing=5):
-                frame.title = "Data Logging"
-                frame.visible = True
-                dict = {
-                    "label": "Output Directory",
-                    "type": "stringfield",
-                    "default_val": os.path.join(os.getcwd(), "output_data.json"),
-                    "tooltip": "Output Directory",
-                    "on_clicked_fn": None,
-                    "use_folder_picker": False,
-                    "read_only": False,
-                }
-                self.ui_elements["Output Directory"] = str_builder(**dict)
-
-                dict = {
-                    "label": "Start Logging",
-                    "type": "button",
-                    "a_text": "START",
-                    "b_text": "PAUSE",
-                    "tooltip": "Start Logging",
-                    "on_clicked_fn": self._on_logging_button_event,
-                }
-                self.ui_elements["Start Logging"] = state_btn_builder(**dict)
-                self.ui_elements["Start Logging"].enabled = False
-
-                dict = {
-                    "label": "Save Data",
-                    "type": "button",
-                    "text": "Save Data",
-                    "tooltip": "Save Data",
-                    "on_clicked_fn": self._on_save_data_button_event,
-                }
-                self.ui_elements["Save Data"] = btn_builder(**dict)
-                self.ui_elements["Save Data"].enabled = False
-
-                dict = {
-                    "label": "Print pos",
-                    "type": "button",
-                    "text": "Print pos",
-                    "on_clicked_fn": self.sample.print_pos_scene,
-                }
-                self.ui_elements["Print pos"] = btn_builder(**dict)
-                # self.ui_elements["Print pos"].enabled = True
-
-    def build_data_logging_ui_new(self, frame):
-        with frame:
-            with ui.VStack(spacing=5):
-                frame.title = "Data Logging"
-                frame.visible = True
-                dict = {
-                    "label": "Output Directory",
-                    "type": "stringfield",
-                    "default_val": os.path.join(os.getcwd(), "output_data.json"),
-                    "tooltip": "Output Directory",
-                    "on_clicked_fn": None,
-                    "use_folder_picker": False,
-                    "read_only": False,
-                }
-                self.ui_elements["Output Directory"] = str_builder(**dict)
-
-                dict = {
-                    "label": "Start Logging",
-                    "type": "button",
-                    "a_text": "START",
-                    "b_text": "PAUSE",
-                    "tooltip": "Start Logging",
-                    "on_clicked_fn": self._on_logging_button_event,
-                }
-                self.ui_elements["Start Logging"] = state_btn_builder(**dict)
-                self.ui_elements["Start Logging"].enabled = False
-
-                dict = {
-                    "label": "Save Data",
-                    "type": "button",
-                    "text": "Save Data",
-                    "tooltip": "Save Data",
-                    "on_clicked_fn": self._on_save_data_button_event,
-                }
-
-                self.ui_elements["Save Data"] = btn_builder(**dict)
-                self.ui_elements["Save Data"].enabled = False
-        return
-
-    def post_load_button_event(self):
-        self.ui_elements["Start Logging"].enabled = True
-        self.ui_elements["Save Data"].enabled = False
-    
-    def post_reset_button_event(self):
+    def on_shutdown(self):
         return

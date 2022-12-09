@@ -24,6 +24,7 @@ class Preprocessor:
         self.time_data = [d['current_time'] for d in self.raw_data]
         self.x_pos = np.array([d['data']['base_link_transform_matrix'][-1][0] for d in self.raw_data])
         self.y_pos = np.array([d['data']['base_link_transform_matrix'][-1][1] for d in self.raw_data])
+        self.rot_matrix = np.array([d['data']['base_link_transform_matrix'][:3][:3] for d in self.raw_data])
         self.fl_vel =np.array([d['data']['wheel_velocity_fl'] for d in self.raw_data])
         self.fr_vel =np.array([d['data']['wheel_velocity_fr'] for d in self.raw_data])
         self.rl_vel =np.array([d['data']['wheel_velocity_rl'] for d in self.raw_data])
@@ -38,7 +39,7 @@ class Preprocessor:
 
 
 def main():
-    filepath = f'{os.path.dirname(__file__)}/data/output_data6.json'
+    filepath = f'{os.path.dirname(__file__)}/data/output_data7.json'
     p = Preprocessor(filepath)
     p.read_json()
     p.process_data()
