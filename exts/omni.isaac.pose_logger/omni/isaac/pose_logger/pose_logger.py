@@ -9,6 +9,9 @@ O3DYN_WHEEL_PRIM_PATH = '/Root/wheel_drive/'
 
 KMR_BASE_LINK_PRIM_PATH = '/kmr/kmr_base_link'
 KMR_WHEEL_PRIM_PATH = '/kmr/omniwheel_joints/'
+KMR_ARM_JOINT_PRIM_PATH = '/kmr/kmr_link_'  # Add only number 0-7 
+def get_arm_joint_prim_path(joint_id):
+    return f'/kmr/kmr_link_{joint_id}/kmr_joint_{joint_id-1}'
 
 class PoseLogger:
     def __init__(self):
@@ -29,10 +32,11 @@ class PoseLogger:
         asyncio.ensure_future(load_world_async())
 
     def set_selected_robot(self, robot):
+        self.robot = robot
         if robot == 'KMR':
             self.wheel_prim_path = KMR_WHEEL_PRIM_PATH
             self.base_link_prim_path = KMR_BASE_LINK_PRIM_PATH
-
+            # self.arm_joint_prim_path = 
         elif robot == 'O3dyn':
             self.wheel_prim_path = O3DYN_WHEEL_PRIM_PATH
             self.base_link_prim_path = O3DYN_BASE_LINK_PRIM_PATH
@@ -43,11 +47,6 @@ class PoseLogger:
             'wheel_rl_joint': self.stage.GetPrimAtPath(f'{self.wheel_prim_path}wheel_rl_joint').GetAttribute('state:angular:physics:velocity'),
             'wheel_rr_joint': self.stage.GetPrimAtPath(f'{self.wheel_prim_path}wheel_rr_joint').GetAttribute('state:angular:physics:velocity'),
         }
-        # self.wheel_fl_velocity_attr = self.stage.GetPrimAtPath(f'{self.wheel_prim_path}wheel_fl_joint').GetAttribute('state:angular:physics:velocity')
-        # self.wheel_fr_velocity_attr = self.stage.GetPrimAtPath(f'{self.wheel_prim_path}wheel_fr_joint').GetAttribute('state:angular:physics:velocity')
-        # self.wheel_rl_velocity_attr = self.stage.GetPrimAtPath(f'{self.wheel_prim_path}wheel_rl_joint').GetAttribute('state:angular:physics:velocity')
-        # self.wheel_rr_velocity_attr = self.stage.GetPrimAtPath(f'{self.wheel_prim_path}wheel_rr_joint').GetAttribute('state:angular:physics:velocity')
-
 
     def on_start_logging_event(self):
         world = World.instance()
@@ -59,21 +58,18 @@ class PoseLogger:
         data_logger.reset()
 
         def frame_logging_func_pose(tasks, scene):
-            print("DL logged")
             curr_prim = self.stage.GetPrimAtPath(self.base_link_prim_path)
             timecode = self.timeline.get_current_time() * self.timeline.get_time_codes_per_seconds()
             pose = omni.usd.utils.get_world_transform_matrix(curr_prim, timecode)
-            return {
+            data = {
                 "base_link_transform_matrix": np.array(pose).tolist(),
                 "wheel_velocity_fl": self.wheel_vel_attr['wheel_fl_joint'].Get(),
                 "wheel_velocity_fr": self.wheel_vel_attr['wheel_fr_joint'].Get(),
                 "wheel_velocity_rl": self.wheel_vel_attr['wheel_rl_joint'].Get(),
                 "wheel_velocity_rr": self.wheel_vel_attr['wheel_rr_joint'].Get(),
-                # "wheel_velocity_fl": self.wheel_fl_velocity_attr.Get(),
-                # "wheel_velocity_fr": self.wheel_fr_velocity_attr.Get(),
-                # "wheel_velocity_rl": self.wheel_rl_velocity_attr.Get(),
-                # "wheel_velocity_rr": self.wheel_rr_velocity_attr.Get(),
             }
+            return data
+
         data_logger.add_data_frame_logging_func(frame_logging_func_pose)
         data_logger.start()
         print('[+] DL started')
