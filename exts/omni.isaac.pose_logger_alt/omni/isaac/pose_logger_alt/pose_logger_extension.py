@@ -7,6 +7,16 @@ from omni.isaac.core import World
 import asyncio
 
 
+DATAFILE_PATH = "/home/jorgen/omniverse-extensions/data_processing/data/"
+
+def generate_datafile_name(filename):
+    path = f"{DATAFILE_PATH}{filename}"
+    path_str_len = len(path)
+    id = 0
+    while os.path.exists(path + ".json"):
+        id += 1
+        path = path[:path_str_len] + str(id)
+    return path + ".json"
 
 class PoseLoggerExtension(omni.ext.IExt):
     def on_startup(self, ext_id):
@@ -25,12 +35,12 @@ class PoseLoggerExtension(omni.ext.IExt):
 
                 self.ui_elements['Target prim path'] = str_builder(
                     label='Target prim path',
-                    default_val="/Root/o3dyn/base_link",
+                    default_val="/Root/base_link",
                 )
 
                 self.ui_elements['Log output dir'] = str_builder(
                     label="Output Directory",
-                    default_val=os.path.join(os.getcwd(), "output_data.json"),
+                    default_val="output_data",
                 )
 
                 self.ui_elements['Restart logger button'] = btn_builder(
@@ -52,10 +62,10 @@ class PoseLoggerExtension(omni.ext.IExt):
                     on_clicked_fn=self.on_save_log_event,
                 )
                 
-                self.ui_elements['Step button'] = btn_builder(
-                    label='step',
-                    text='step',
-                    on_clicked_fn=self.pose_logger.step_manually,
+                self.ui_elements['Print button'] = btn_builder(
+                    label='Print Pose',
+                    text='Print Pose',
+                    on_clicked_fn=self.pose_logger.print_pose,
                 )
 
                 self.ui_elements['Add callback'] = btn_builder(
@@ -81,7 +91,8 @@ class PoseLoggerExtension(omni.ext.IExt):
         self.pose_logger.on_logging_event(val)
     
     def on_save_log_event(self):
-        self.pose_logger.on_save_data_event(self.ui_elements['Log output dir'].get_value_as_string())
+        path = generate_datafile_name(self.ui_elements['Log output dir'].get_value_as_string())
+        self.pose_logger.on_save_data_event(path)
 
     def on_shutdown(self):
         return
