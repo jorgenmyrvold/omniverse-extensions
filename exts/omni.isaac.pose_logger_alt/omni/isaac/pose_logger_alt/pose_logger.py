@@ -61,8 +61,12 @@ class PoseLogger:
         return
 
     def add_callback(self):
+        def dummy_callback():
+            a=10
+            return
         world = self.get_world()
-        world.add_physics_callback("my_step", world.step_async)
+        # world.add_physics_callback("dummy_callback", dummy_callback)
+        world.add_physics_callback("dummy_callback", world.step_async)
 
     def print_pose(self):
         curr_prim = self.stage.GetPrimAtPath(self.target_prim_path)

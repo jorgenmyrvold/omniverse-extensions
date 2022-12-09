@@ -52,7 +52,7 @@ class PoseLoggerExtension(omni.ext.IExt):
                     on_clicked_fn=self.on_save_log_event,
                 )
                 
-                self.ui_elements['Print pose button'] = btn_builder(
+                self.ui_elements['Step button'] = btn_builder(
                     label='step',
                     text='step',
                     on_clicked_fn=self.pose_logger.step_manually,
@@ -72,6 +72,7 @@ class PoseLoggerExtension(omni.ext.IExt):
                 await self._world.initialize_simulation_context_async()
             else:
                 self._world = World.instance()
+            
         asyncio.ensure_future(load_world_async())
         return
 
