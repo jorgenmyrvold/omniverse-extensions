@@ -178,6 +178,10 @@ class KMRLoader(BaseSample):
                 usd_prim=joint_prim,
                 component="PhysicsDrive:angular"
             )
+            omni.kit.commands.execute("AddPhysicsComponent",
+                usd_prim=joint_prim,
+                component="PhysicsJointState:angular"
+            )
             omni.kit.commands.execute("ChangeProperty",
                 prop_path=f"{joint_prim.GetPrimPath()}.drive:angular:physics:damping",
                 value=10_000,  # Random value used in multiple isaac tutorials. Has to be non-zero to drive
@@ -218,10 +222,10 @@ class KMRLoader(BaseSample):
   
         keys = og.Controller.Keys
         # self._setup_kmp_graph(keys)
-        self._setup_iiwa_graph(keys)
-        self._setup_lidar_graph(keys, is_front_lidar=True)
-        self._setup_lidar_graph(keys, is_front_lidar=False)
-        self._setup_tf_graph(keys)
+        # self._setup_iiwa_graph(keys)
+        # self._setup_lidar_graph(keys, is_front_lidar=True)
+        # self._setup_lidar_graph(keys, is_front_lidar=False)
+        # self._setup_tf_graph(keys)
         # self._setup_odom_graph(keys)
         # for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
         #     self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)

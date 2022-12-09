@@ -2,12 +2,13 @@ import os
 import omni.ext
 import omni.ui as ui
 from omni.isaac.pose_logger.pose_logger import PoseLogger
-from omni.isaac.ui.ui_utils import setup_ui_headers, str_builder, btn_builder, state_btn_builder
+from omni.isaac.ui.ui_utils import setup_ui_headers, str_builder, btn_builder, dropdown_builder
 from omni.isaac.core import World
 import asyncio
 
 
 DATAFILE_PATH = "/home/jorgen/omniverse-extensions/data_processing/data/"
+SELECTABLE_ROBOTS = ['KMR', 'O3dyn']
 
 def generate_datafile_name(filename):
     path = f"{DATAFILE_PATH}{filename}"
@@ -34,11 +35,11 @@ class PoseLoggerExtension(omni.ext.IExt):
                     title="Pose logger",
                 )
                 
-                self.ui_elements['Target prim path'] = str_builder(
-                    label='Target prim path',
-                    default_val="/Root/base_link",
+                self.ui_elements['Robot selector'] = dropdown_builder(
+                    label="Select robot",
+                    items=SELECTABLE_ROBOTS,
+                    default_val=0,
                 )
-
                 self.ui_elements['Log output dir'] = str_builder(
                     label="Output filename",
                     default_val="output_data",
@@ -65,7 +66,7 @@ class PoseLoggerExtension(omni.ext.IExt):
         
     def on_initialize_event(self):
         self.pose_logger.load_world()
-        self.pose_logger.set_target_prim_path(self.ui_elements['Target prim path'].get_value_as_string())
+        self.pose_logger.set_selected_robot(SELECTABLE_ROBOTS[self.ui_elements['Robot selector'].get_item_value_model().get_value_as_int()])
         self.ui_elements['Logging button'].enabled = True
         print('[+] Initialized')
         

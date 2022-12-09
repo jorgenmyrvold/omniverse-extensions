@@ -42,7 +42,7 @@ class Preprocessor:
 
 
 def main():
-    filepath = f'{os.path.dirname(__file__)}/data/output_data11.json'
+    filepath = f'{os.path.dirname(__file__)}/data/output_data.json'
     p = Preprocessor(filepath)
     p.read_json()
     p.process_data()
