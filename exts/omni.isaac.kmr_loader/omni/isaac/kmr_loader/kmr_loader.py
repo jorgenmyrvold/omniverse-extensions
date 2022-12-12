@@ -12,8 +12,10 @@ ENVIRONMENT_BASE_PATH = "omniverse://localhost/NVIDIA/Assets/Isaac/2022.1/Isaac/
 KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr_wo_wheels.urdf"
 # OMNIWHEELS_PATH = "/home/jorgen/isaac_ws/omniwheels/"
 OMNIWHEELS_PATH = "/home/jorgen/misc_repos/o3dynsimmodel/Parts/"
+OMNIWHEELS_SCALING_FACTOR = 0.875
 ROS2_FRAME_ID = "world"
 ROS2_CONTEXT_DOMAIN_ID = 0
+
 
 
 class KMRLoader(BaseSample):
@@ -36,7 +38,7 @@ class KMRLoader(BaseSample):
         environment_path = ENVIRONMENT_BASE_PATH + self.environment + ".usd"
         omni.kit.commands.execute("CreateReference",
             usd_context=omni.usd.get_context(),
-            path_to=f"/World/Environment",
+            path_to=f"/Environment",
             asset_path=environment_path,   
         )
 
@@ -71,6 +73,19 @@ class KMRLoader(BaseSample):
         return result, prim_path
 
     def _rig_robot(self):
+        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
+            prim_type="Scope",
+            prim_path=f"{self._kmr_prim}/cameras",
+        )
+        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
+            prim_type="Scope",
+            prim_path=f"{self._kmr_prim}/gripper",
+        )
+        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
+            prim_type="Scope",
+            prim_path=f"{self._kmr_prim}/arm",
+        )
+
         res, self._lidar1_prim = self._create_lidar_sensor(is_front_lidar=True)
         res, self._lidar2_prim = self._create_lidar_sensor(is_front_lidar=False)
         self._load_omniwheels()
@@ -112,7 +127,6 @@ class KMRLoader(BaseSample):
         return result, prim
 
     def _load_omniwheels(self, omniwheels_path=OMNIWHEELS_PATH):
-        # TODO: Left wheels have correct rotation direction. Right wheels have to be reversed
         """
         omnisheels_path should point to the directory where the four omniwheels with names
         omniwheel_fl.usd, omniwheel_fr.usd, omniwheel_rl.usd, omniwheel_rr.usd
@@ -158,7 +172,7 @@ class KMRLoader(BaseSample):
             elif prim_name[-2:] == "rr":
                 UsdGeom.Xformable(omniwheel_prim).AddTranslateOp().Set((-0.28, -0.1825, 0.125))
                 UsdGeom.Xformable(omniwheel_prim).AddRotateXYZOp().Set((0, 0, -90))
-            UsdGeom.Xformable(omniwheel_prim).AddScaleOp(precision=UsdGeom.XformOp.PrecisionDouble).Set((0.875, 0.875, 0.875))
+            UsdGeom.Xformable(omniwheel_prim).AddScaleOp(precision=UsdGeom.XformOp.PrecisionDouble).Set((OMNIWHEELS_SCALING_FACTOR, OMNIWHEELS_SCALING_FACTOR, OMNIWHEELS_SCALING_FACTOR))
 
             success, joint_prim = omni.kit.commands.execute("CreateJointCommand",
                 stage=self._stage,
@@ -221,70 +235,68 @@ class KMRLoader(BaseSample):
         )
   
         keys = og.Controller.Keys
-        # self._setup_kmp_graph(keys)
+        self._setup_twist_cmd_graph(keys)
         # self._setup_iiwa_graph(keys)
         # self._setup_lidar_graph(keys, is_front_lidar=True)
         # self._setup_lidar_graph(keys, is_front_lidar=False)
-        # self._setup_tf_graph(keys)
+        self._setup_tf_graph(keys, only_world_tf=True)
         # self._setup_odom_graph(keys)
         # for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
         #     self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)
         return
     
-    def _setup_kmp_graph(self, keys):
-        # TODO: Not checked that the robot actually moves 
-        # graph_prim_path = f"{self._og_scope_prim_path}/kmp_controller_graph"
-        graph_prim_path = "/kmp_controller_graph"
+    def _setup_twist_cmd_graph(self, keys):
+        graph_prim_path = "/twist_cmd_graph"
         og.Controller.edit(
             {"graph_path": graph_prim_path, "evaluator_name": "execution"},
             {
                 keys.CREATE_NODES: [
                     ("on_playback_tick", "omni.graph.action.OnPlaybackTick"),
-                    ("constant_token_FR", "omni.graph.nodes.ConstantToken"), # Front Right etc...
-                    ("constant_token_FL", "omni.graph.nodes.ConstantToken"),
-                    ("constant_token_RR", "omni.graph.nodes.ConstantToken"),
-                    ("constant_token_RL", "omni.graph.nodes.ConstantToken"),
-                    ("constant_double_FR", "omni.graph.nodes.ConstantDouble"),
-                    ("constant_double_FL", "omni.graph.nodes.ConstantDouble"),
-                    ("constant_double_RR", "omni.graph.nodes.ConstantDouble"),
-                    ("constant_double_RL", "omni.graph.nodes.ConstantDouble"),
-                    ("make_array_joint_names", "omni.graph.nodes.MakeArray"),
-                    ("make_array_joint_vel", "omni.graph.nodes.MakeArray"),
+                    ("ros2_context", "omni.isaac.ros2_bridge.ROS2Context"),
+                    ("ros2_subscribe_twist", "omni.isaac.ros2_bridge.ROS2SubscribeTwist"),
+                    ("break_3_vector_rot", "omni.graph.nodes.BreakVector3"),
+                    ("break_3_vector_vel", "omni.graph.nodes.BreakVector3"),
+                    ("make_3_vector", "omni.graph.nodes.MakeVector3"),
+                    ("holonomic_controller", "omni.isaac.wheeled_robots.HolonomicController"),
                     ("articulation_controller", "omni.isaac.core_nodes.IsaacArticulationController"),
                 ],
                 keys.SET_VALUES: [
-                    ("constant_token_FR.inputs:value", "wheel_fr_joint"),
-                    ("constant_token_FL.inputs:value", "wheel_fl_joint"),
-                    ("constant_token_RR.inputs:value", "wheel_rr_joint"),
-                    ("constant_token_RL.inputs:value", "wheel_rl_joint"),  # forward | sideways
-                    ("constant_double_FR.inputs:value", -5.0),                               # 5       | -5
-                    ("constant_double_FL.inputs:value", 5.0),                               # 5       | 5
-                    ("constant_double_RR.inputs:value", 5.0),                               # 5       | 5
-                    ("constant_double_RL.inputs:value", -5.0),                               # 5       | -5
-                    ("make_array_joint_names.inputs:arraySize", 4),
-                    ("make_array_joint_vel.inputs:arraySize", 4),
-                    # ("articulation_controller.inputs:robotPath", self._kmr_prim),
+                    ("holonomic_controller.inputs:upAxis", [0, 0, 1]),
+                    ("holonomic_controller.inputs:wheelAxis", [0, 1, 0]),
+                    ("holonomic_controller.inputs:wheelRadius", [0.1289999932050705 * OMNIWHEELS_SCALING_FACTOR] * 4),  # 0.1289999932050705 from O3dyn model scaled down with 0.875. Same as wheels
+                    ("holonomic_controller.inputs:wheelOrientations", [[-0.5, 0.5, 0.5, -0.5], 
+                                                                       [ 0.5, 0.5, 0.5,  0.5], 
+                                                                       [-0.5, 0.5, 0.5, -0.5], 
+                                                                       [ 0.5, 0.5, 0.5,  0.5]]),
+                    ("holonomic_controller.inputs:wheelPositions", [( 0.28,  0.1825, -0.2), 
+                                                                    ( 0.28, -0.1825, -0.2), 
+                                                                    (-0.28,  0.1825, -0.2), 
+                                                                    (-0.28, -0.1825, -0.2)]),
+                    ("holonomic_controller.inputs:mecanumAngles", [-135, -45, -45, -135]),
+                    ("holonomic_controller.inputs:maxLinearSpeed", 1.0),  # Max speed according to specifications
+                    ("holonomic_controller.inputs:maxAngularSpeed", 0.35),  # Actual max speed is 0.51 s/rad. Reduced as the robot jumps around at higher speeds
+                    ("articulation_controller.inputs:jointNames", ["wheel_fl_joint", "wheel_fr_joint", "wheel_rl_joint", "wheel_rr_joint"]),
                     ("articulation_controller.inputs:usePath", False),
                 ],
                 keys.CONNECT: [
                     ("on_playback_tick.outputs:tick", "articulation_controller.inputs:execIn"),
-                    ("constant_token_FR.inputs:value", "make_array_joint_names.inputs:a"),
-                    ("constant_token_FL.inputs:value", "make_array_joint_names.inputs:b"),
-                    ("constant_token_RR.inputs:value", "make_array_joint_names.inputs:c"),
-                    ("constant_token_RL.inputs:value", "make_array_joint_names.inputs:d"),
-                    ("constant_double_FR.inputs:value", "make_array_joint_vel.inputs:a"),
-                    ("constant_double_FL.inputs:value", "make_array_joint_vel.inputs:b"),
-                    ("constant_double_RR.inputs:value", "make_array_joint_vel.inputs:c"),
-                    ("constant_double_RL.inputs:value", "make_array_joint_vel.inputs:d"),
-                    ("make_array_joint_names.outputs:array", "articulation_controller.inputs:jointNames"),
-                    ("make_array_joint_vel.outputs:array", "articulation_controller.inputs:velocityCommand"),
+                    ("on_playback_tick.outputs:tick", "ros2_subscribe_twist.inputs:execIn"),
+                    ("ros2_context.outputs:context", "ros2_subscribe_twist.inputs:context"),
+                    ("ros2_subscribe_twist.outputs:execOut", "holonomic_controller.inputs:execIn"),
+                    ("ros2_subscribe_twist.outputs:angularVelocity", "break_3_vector_rot.inputs:tuple"),
+                    ("ros2_subscribe_twist.outputs:linearVelocity", "break_3_vector_vel.inputs:tuple"),
+                    ("break_3_vector_rot.outputs:z", "make_3_vector.inputs:z"),
+                    ("break_3_vector_vel.outputs:x", "make_3_vector.inputs:x"),
+                    ("break_3_vector_vel.outputs:y", "make_3_vector.inputs:y"),
+                    ("make_3_vector.outputs:tuple", "holonomic_controller.inputs:velocityCommands"),
+                    ("holonomic_controller.outputs:jointVelocityCommand", "articulation_controller.inputs:velocityCommand"),
                 ]
             }
         )
-        # read_lidar_og_path = f"{graph_path}/isaac_read_lidar_beam_node"
         usd_prim = self._stage.GetPrimAtPath(f"{graph_prim_path}/articulation_controller")
         usd_prim.GetRelationship("inputs:targetPrim").AddTarget(self._kmr_prim)
         print(f"[+] Created {graph_prim_path}")
+
     
     def _setup_iiwa_graph(self, keys):
         # Example from https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/tutorial_ros2_manipulation.html#add-joint-states-in-extension
@@ -369,7 +381,7 @@ class KMRLoader(BaseSample):
         usd_prim.GetRelationship("inputs:lidarPrim").AddTarget(lidar_prim_path)
         print(f"[+] Created {graph_path}")
 
-    def _setup_tf_graph(self, keys):
+    def _setup_tf_graph(self, keys, only_world_tf=False):
         # TODO: Check that tf publishes as intended
         graph_path = f"{self._og_scope_prim_path}/tf_pub_graph"
         og.Controller.edit(

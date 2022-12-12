@@ -22,7 +22,6 @@ def generate_datafile_name(filename):
 
 class PoseLoggerExtension(omni.ext.IExt):
     def on_startup(self, ext_id):
-        # self.load_world()
         self.pose_logger = PoseLogger()  # Logic part of extension
         self.ui_elements = {}
 
