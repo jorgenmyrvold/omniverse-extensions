@@ -46,6 +46,7 @@ class KMRLoader(BaseSample):
         self._stage.SetDefaultPrim(self._stage.GetPrimAtPath(f"{self._kmr_prim}"))
         self._rig_robot()
         self._setup_omnigraphs()
+        self._organize_stage()
         return
     
     
@@ -73,19 +74,6 @@ class KMRLoader(BaseSample):
         return result, prim_path
 
     def _rig_robot(self):
-        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
-            prim_type="Scope",
-            prim_path=f"{self._kmr_prim}/cameras",
-        )
-        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
-            prim_type="Scope",
-            prim_path=f"{self._kmr_prim}/gripper",
-        )
-        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
-            prim_type="Scope",
-            prim_path=f"{self._kmr_prim}/arm",
-        )
-
         res, self._lidar1_prim = self._create_lidar_sensor(is_front_lidar=True)
         res, self._lidar2_prim = self._create_lidar_sensor(is_front_lidar=False)
         self._load_omniwheels()
@@ -246,7 +234,7 @@ class KMRLoader(BaseSample):
         return
     
     def _setup_twist_cmd_graph(self, keys):
-        graph_prim_path = "/twist_cmd_graph"
+        graph_prim_path = f"{self._og_scope_prim_path}/twist_cmd_graph"
         og.Controller.edit(
             {"graph_path": graph_prim_path, "evaluator_name": "execution"},
             {
@@ -297,7 +285,6 @@ class KMRLoader(BaseSample):
         usd_prim.GetRelationship("inputs:targetPrim").AddTarget(self._kmr_prim)
         print(f"[+] Created {graph_prim_path}")
 
-    
     def _setup_iiwa_graph(self, keys):
         # Example from https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/tutorial_ros2_manipulation.html#add-joint-states-in-extension
         # TODO: Check that it publishes and subscribes as intended
@@ -507,6 +494,23 @@ class KMRLoader(BaseSample):
             }
         )
         print(f"[+] Created {graph_path}")
+
+
+    def _organize_stage(self):
+        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
+            prim_type="Scope",
+            prim_path=f"{self._kmr_prim}/cameras",
+        )
+        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
+            prim_type="Scope",
+            prim_path=f"{self._kmr_prim}/gripper",
+        )
+        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
+            prim_type="Scope",
+            prim_path=f"{self._kmr_prim}/arm",
+        )
+
+        
 
 
     async def setup_post_load(self):
