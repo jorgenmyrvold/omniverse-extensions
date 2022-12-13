@@ -248,7 +248,7 @@ class KMRLoader(BaseSample):
         self._setup_iiwa_graph(keys)
         self._setup_lidar_graph(keys, is_front_lidar=True)
         self._setup_lidar_graph(keys, is_front_lidar=False)
-        self._setup_tf_graph(keys, only_world_tf=True)
+        self._setup_tf_graph(keys)
         self._setup_odom_graph(keys)
         # for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
         #     self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)
@@ -384,13 +384,11 @@ class KMRLoader(BaseSample):
                 ],
             }
         )
-        read_lidar_og_path = f"{graph_path}/isaac_read_lidar_beam_node"
-        usd_prim = self._stage.GetPrimAtPath(read_lidar_og_path)
+        usd_prim = self._stage.GetPrimAtPath(f"{graph_path}/isaac_read_lidar_beam_node")
         usd_prim.GetRelationship("inputs:lidarPrim").AddTarget(lidar_prim_path)
         print(f"[+] Created {graph_path}")
 
-    def _setup_tf_graph(self, keys, only_world_tf=False):
-        # TODO: Check that tf publishes as intended
+    def _setup_tf_graph(self, keys):
         graph_path = f"{self._og_scope_prim_path}/tf_pub_graph"
         og.Controller.edit(
             {"graph_path": graph_path, "evaluator_name": "execution"},
@@ -411,15 +409,7 @@ class KMRLoader(BaseSample):
                 ]
             }
         )
-        
-        tf_publisher_og_path = f"{graph_path}/ros2_pub_tf"
-        usd_prim = self._stage.GetPrimAtPath(tf_publisher_og_path)
-        # usd_prim.GetRelationship("inputs:parentPrim").AddTarget("/World")
-        # usd_prim.GetRelationship("inputs:parentPrim").AddTarget(f"{self._kmr_prim}/kmriiwa_base_link")
-        # 
-        # TODO: Problem with multiple targets
-        # usd_prim.GetRelationship("inputs:targetPrims").AddTarget(f"{self._kmr_prim}/kmriiwa_laser_B1_link/Lidar")
-        # usd_prim.GetRelationship("inputs:targetPrims").AddTarget(f"{self._kmr_prim}/kmriiwa_laser_B4_link/Lidar")
+        usd_prim = self._stage.GetPrimAtPath(f"{graph_path}/ros2_pub_tf")
         usd_prim.GetRelationship("inputs:targetPrims").AddTarget(self._base_link_prim_path)        
         print(f"[+] Created {graph_path}")
 
@@ -458,11 +448,8 @@ class KMRLoader(BaseSample):
                 ]
             }
         )
-        
-        compute_odom_og_path = f"{graph_path}/isaac_compute_odom"
-        usd_prim = self._stage.GetPrimAtPath(compute_odom_og_path)
+        usd_prim = self._stage.GetPrimAtPath(f"{graph_path}/isaac_compute_odom")
         usd_prim.GetRelationship("inputs:chassisPrim").AddTarget(self._base_link_prim_path)
-        
         print(f"[+] Created {graph_path}")
 
     def _setup_camera_graph(self, keys, camera_prim_path, topic_suffix, viewport_id):
