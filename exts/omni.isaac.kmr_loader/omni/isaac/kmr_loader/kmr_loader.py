@@ -9,7 +9,8 @@ from omni.isaac.urdf import _urdf
 
 ENVIRONMENT_BASE_PATH = "omniverse://localhost/NVIDIA/Assets/Isaac/2022.1/Isaac/Environments/"
 # KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr.urdf"
-KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr_wo_wheels.urdf"
+# KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr_wo_wheels.urdf"
+KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr_simple_camera_wo_wheels.urdf"
 # OMNIWHEELS_PATH = "/home/jorgen/isaac_ws/omniwheels/"
 OMNIWHEELS_PATH = "/home/jorgen/misc_repos/o3dynsimmodel/Parts/"
 OMNIWHEELS_SCALING_FACTOR = 0.875
@@ -42,8 +43,7 @@ class KMRLoader(BaseSample):
             asset_path=environment_path,   
         )
 
-        res, self._kmr_prim = self._load_kmr()
-        self._stage.SetDefaultPrim(self._stage.GetPrimAtPath(f"{self._kmr_prim}"))
+        result = self._load_kmr()
         self._rig_robot()
         self._setup_omnigraphs()
         self._organize_stage()
@@ -56,7 +56,7 @@ class KMRLoader(BaseSample):
         import_config.convex_decomp = False
         import_config.import_inertia_tensor = True
         import_config.fix_base = False
-        import_config.make_default_prim = False
+        import_config.make_default_prim = True
         import_config.self_collision = False
         import_config.create_physics_scene = False
         import_config.import_inertia_tensor = False
@@ -66,12 +66,33 @@ class KMRLoader(BaseSample):
         import_config.distance_scale = 1
         import_config.density = 0.0
         
-        result, prim_path = omni.kit.commands.execute(
+        result, self._kmr_prim = omni.kit.commands.execute(
             "URDFParseAndImportFile", 
             urdf_path=urdf_filepath,
             import_config=import_config
         )
-        return result, prim_path
+        self._base_link_prim_path = f'{self._kmr_prim}/kmr_base_link'  # Later set as the articulation root
+
+        # Set the correct articulation root so that tf is correct
+        omni.kit.commands.execute(
+            "RemovePhysicsComponent",
+            usd_prim=self._stage.GetPrimAtPath(self._kmr_prim),
+            component="PhysicsArticulationRootAPI",
+            multiple_api_token=None
+        )
+        omni.kit.commands.execute(
+            "AddPhysicsComponent",
+            usd_prim=self._stage.GetPrimAtPath(self._base_link_prim_path),
+            component="PhysicsArticulationRootAPI",
+        )
+        omni.kit.commands.execute(
+            "ChangeProperty",
+            prop_path=f'{self._base_link_prim_path}.physxArticulation:enabledSelfCollisions',
+            value=False,
+            prev=None
+        )
+
+        return result
 
     def _rig_robot(self):
         res, self._lidar1_prim = self._create_lidar_sensor(is_front_lidar=True)
@@ -120,7 +141,7 @@ class KMRLoader(BaseSample):
         omniwheel_fl.usd, omniwheel_fr.usd, omniwheel_rl.usd, omniwheel_rr.usd
         """
         # Create scope to place the omniwheels in
-        omniwheel_scope_prim_path = f"{self._kmr_prim}/omniwheel"
+        omniwheel_scope_prim_path = f"{self._kmr_prim}/omniwheels"
         omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
             prim_type="Scope",
             prim_path=omniwheel_scope_prim_path,
@@ -132,10 +153,10 @@ class KMRLoader(BaseSample):
             prim_path=joint_scope_prim_path,
         )
 
-        omniwheels = {"omniwheel_fl": "wheel_left", 
-                      "omniwheel_fr": "wheel_right", 
-                      "omniwheel_rl": "wheel_right",
-                      "omniwheel_rr": "wheel_left"}
+        omniwheels = {"omniwheel_fl": "wheel_fl",  # wheel_left 
+                      "omniwheel_fr": "wheel_fr",  # wheel_right
+                      "omniwheel_rl": "wheel_rl",  # wheel_right
+                      "omniwheel_rr": "wheel_rr"}  # wheel_left
 
         for prim_name, file_name in omniwheels.items():
             omniwheel_prim_path = f"{omniwheel_scope_prim_path}/{prim_name}"
@@ -165,8 +186,8 @@ class KMRLoader(BaseSample):
             success, joint_prim = omni.kit.commands.execute("CreateJointCommand",
                 stage=self._stage,
                 joint_type="Revolute",
-                from_prim=self._stage.GetPrimAtPath(f"{self._kmr_prim}/kmr_base_link"),
-                to_prim=self._stage.GetPrimAtPath(f"{omniwheel_prim_path}/omniwheel")
+                from_prim=self._stage.GetPrimAtPath(self._base_link_prim_path),
+                to_prim=self._stage.GetPrimAtPath(f"{omniwheel_prim_path}/omniwheel_{prim_name[-2:]}")
             )
             # Joints on right side have to be rotated 180 deg around z-axis so that positive angular drive corresponds to positive velocity
             if prim_name[-1:] == "r": 
@@ -204,7 +225,7 @@ class KMRLoader(BaseSample):
             omni.kit.commands.execute("CreatePrimWithDefaultXform",
                 prim_type="Camera",
                 prim_path=prim_path,
-                attributes={'focusDistance': 400, 'focalLength': 24},  # Possible to set other parameters here
+                attributes={'focusDistance': 400, 'focalLength': 24},  # TODO: Default parameters, should be matched real cameras
             )
             omni.kit.commands.execute("ChangeProperty",
                 prop_path=f"{prim_path}.xformOp:orient",
@@ -224,11 +245,11 @@ class KMRLoader(BaseSample):
   
         keys = og.Controller.Keys
         self._setup_twist_cmd_graph(keys)
-        # self._setup_iiwa_graph(keys)
-        # self._setup_lidar_graph(keys, is_front_lidar=True)
-        # self._setup_lidar_graph(keys, is_front_lidar=False)
+        self._setup_iiwa_graph(keys)
+        self._setup_lidar_graph(keys, is_front_lidar=True)
+        self._setup_lidar_graph(keys, is_front_lidar=False)
         self._setup_tf_graph(keys, only_world_tf=True)
-        # self._setup_odom_graph(keys)
+        self._setup_odom_graph(keys)
         # for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
         #     self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)
         return
@@ -282,7 +303,7 @@ class KMRLoader(BaseSample):
             }
         )
         usd_prim = self._stage.GetPrimAtPath(f"{graph_prim_path}/articulation_controller")
-        usd_prim.GetRelationship("inputs:targetPrim").AddTarget(self._kmr_prim)
+        usd_prim.GetRelationship("inputs:targetPrim").AddTarget(self._base_link_prim_path)
         print(f"[+] Created {graph_prim_path}")
 
     def _setup_iiwa_graph(self, keys):
@@ -313,12 +334,12 @@ class KMRLoader(BaseSample):
                     # Providing path to /panda robot to Articulation Controller node
                     # Providing the robot path is equivalent to setting the targetPrim in Articulation Controller node
                     ("ArticulationController.inputs:usePath", True),
-                    ("ArticulationController.inputs:robotPath", self._kmr_prim),
+                    ("ArticulationController.inputs:robotPath", self._base_link_prim_path),
                 ],
             },
         )
         # Setting the /panda target prim to Publish JointState node
-        set_target_prims(primPath=f"{graph_prim_path}/PublishJointState", targetPrimPaths=[f"{self._kmr_prim}"])
+        set_target_prims(primPath=f"{graph_prim_path}/PublishJointState", targetPrimPaths=[f"{self._base_link_prim_path}"])
         print(f"[+] Created {graph_prim_path}")
 
     def _setup_lidar_graph(self, keys, is_front_lidar: bool):
@@ -399,7 +420,7 @@ class KMRLoader(BaseSample):
         # TODO: Problem with multiple targets
         # usd_prim.GetRelationship("inputs:targetPrims").AddTarget(f"{self._kmr_prim}/kmriiwa_laser_B1_link/Lidar")
         # usd_prim.GetRelationship("inputs:targetPrims").AddTarget(f"{self._kmr_prim}/kmriiwa_laser_B4_link/Lidar")
-        usd_prim.GetRelationship("inputs:targetPrims").AddTarget(self._kmr_prim)        
+        usd_prim.GetRelationship("inputs:targetPrims").AddTarget(self._base_link_prim_path)        
         print(f"[+] Created {graph_path}")
 
     def _setup_odom_graph(self, keys):
@@ -440,7 +461,7 @@ class KMRLoader(BaseSample):
         
         compute_odom_og_path = f"{graph_path}/isaac_compute_odom"
         usd_prim = self._stage.GetPrimAtPath(compute_odom_og_path)
-        usd_prim.GetRelationship("inputs:chassisPrim").AddTarget(self._kmr_prim)
+        usd_prim.GetRelationship("inputs:chassisPrim").AddTarget(self._base_link_prim_path)
         
         print(f"[+] Created {graph_path}")
 
