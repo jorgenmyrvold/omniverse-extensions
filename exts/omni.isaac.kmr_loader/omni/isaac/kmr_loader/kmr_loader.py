@@ -71,22 +71,28 @@ class KMRLoader(BaseSample):
             urdf_path=urdf_filepath,
             import_config=import_config
         )
-        self._base_link_prim_path = f'{self._kmr_prim}/kmr_base_link'  # Later set as the articulation root
+        self._base_link_frame_id = "base_link"
+        self._base_link_prim_path = f'{self._kmr_prim}/{self._base_link_frame_id}'  # Later set as the articulation root
+
+        # [0, 0, 0] is underneath some shelves so when using environment "warehouse_multiple_shelves" the robot has to be moved
+        if self.environment == "Simple_Warehouse/warehouse_multiple_shelves":
+            omni.kit.commands.execute("ChangeProperty",
+                prop_path=f"{self._kmr_prim}.xformOp:translate",
+                value=(2,0,0),
+                prev=(0,0,0)
+            )
 
         # Set the correct articulation root so that tf is correct
-        omni.kit.commands.execute(
-            "RemovePhysicsComponent",
+        omni.kit.commands.execute("RemovePhysicsComponent",
             usd_prim=self._stage.GetPrimAtPath(self._kmr_prim),
             component="PhysicsArticulationRootAPI",
             multiple_api_token=None
         )
-        omni.kit.commands.execute(
-            "AddPhysicsComponent",
+        omni.kit.commands.execute("AddPhysicsComponent",
             usd_prim=self._stage.GetPrimAtPath(self._base_link_prim_path),
             component="PhysicsArticulationRootAPI",
         )
-        omni.kit.commands.execute(
-            "ChangeProperty",
+        omni.kit.commands.execute("ChangeProperty",
             prop_path=f'{self._base_link_prim_path}.physxArticulation:enabledSelfCollisions',
             value=False,
             prev=None
@@ -110,7 +116,7 @@ class KMRLoader(BaseSample):
             parent_prim = f"{self._kmr_prim}/kmr_laser_B4_link"
             yaw_offset = 0.0  # 225.0
             horizontal_fov = 249.0  # Experimental values
-            
+
         result, prim = omni.kit.commands.execute(
             "RangeSensorCreateLidar",
             path="/Lidar",
@@ -128,7 +134,6 @@ class KMRLoader(BaseSample):
             yaw_offset=yaw_offset,
             enable_semantics=False,
         )
-        
         if result:
             print(f"[+] Created {parent_prim}/Lidar")
         else:
@@ -244,15 +249,101 @@ class KMRLoader(BaseSample):
         )
   
         keys = og.Controller.Keys
+        self._setup_publish_clock_graph(keys)
         self._setup_twist_cmd_graph(keys)
         self._setup_iiwa_graph(keys)
         self._setup_lidar_graph(keys, is_front_lidar=True)
         self._setup_lidar_graph(keys, is_front_lidar=False)
-        self._setup_tf_graph(keys)
-        self._setup_odom_graph(keys)
+        # self._setup_tf_graph(keys, include_world_frame=True)
+        # self._setup_odom_graph(keys)
+
+        self._setup_tf_odom_graph(keys)
         # for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
         #     self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)
         return
+
+    def _setup_tf_odom_graph(self, keys):
+
+        # Original tf graph
+        graph_path = f"{self._og_scope_prim_path}/tf_odom_graph"
+        og.Controller.edit(
+            {"graph_path": graph_path, "evaluator_name": "execution"},
+            {
+                keys.CREATE_NODES: [
+                    ("on_playback_tick", "omni.graph.action.OnPlaybackTick"),
+                    ("ros2_context", "omni.isaac.ros2_bridge.ROS2Context"),
+                    ("isaac_read_sim_time", "omni.isaac.core_nodes.IsaacReadSimulationTime"),
+                    ("ros2_pub_tf_1", "omni.isaac.ros2_bridge.ROS2PublishTransformTree"),
+                    ("ros2_pub_tf_2", "omni.isaac.ros2_bridge.ROS2PublishTransformTree"),
+                    ("isaac_compute_odom", "omni.isaac.core_nodes.IsaacComputeOdometry"),
+                    ("ros2_pub_odom", "omni.isaac.ros2_bridge.ROS2PublishOdometry"),
+                    ("ros2_pub_raw_tf", "omni.isaac.ros2_bridge.ROS2PublishRawTransformTree"),
+                ],
+                keys.SET_VALUES: [
+                    ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
+                    ("ros2_pub_raw_tf.inputs:topicName", "tf"),
+                    ("ros2_pub_odom.inputs:chassisFrameId", self._base_link_frame_id)
+                ],
+                keys.CONNECT: [
+                    ("on_playback_tick.outputs:tick", "ros2_pub_tf_1.inputs:execIn"),
+                    ("on_playback_tick.outputs:tick", "ros2_pub_tf_2.inputs:execIn"),
+                    ("on_playback_tick.outputs:tick", "ros2_pub_raw_tf.inputs:execIn"),
+                    ("on_playback_tick.outputs:tick", "isaac_compute_odom.inputs:execIn"),
+                    ("on_playback_tick.outputs:tick", "ros2_pub_odom.inputs:execIn"),
+                    ("ros2_context.outputs:context", "ros2_pub_tf_1.inputs:context"),
+                    ("ros2_context.outputs:context", "ros2_pub_tf_2.inputs:context"),
+                    ("isaac_read_sim_time.outputs:simulationTime", "ros2_pub_tf_1.inputs:timeStamp"),
+                    ("isaac_read_sim_time.outputs:simulationTime", "ros2_pub_tf_2.inputs:timeStamp"),
+                    ("ros2_context.outputs:context", "ros2_pub_raw_tf.inputs:context"),
+                    ("isaac_compute_odom.outputs:orientation", "ros2_pub_raw_tf.inputs:rotation"),
+                    ("isaac_compute_odom.outputs:position", "ros2_pub_raw_tf.inputs:translation"),
+                    ("isaac_read_sim_time.outputs:simulationTime", "ros2_pub_raw_tf.inputs:timeStamp"),
+                    ("ros2_context.outputs:context", "ros2_pub_odom.inputs:context"),
+                    ("isaac_read_sim_time.outputs:simulationTime", "ros2_pub_odom.inputs:timeStamp"),
+                    ("isaac_compute_odom.outputs:angularVelocity", "ros2_pub_odom.inputs:angularVelocity"),
+                    ("isaac_compute_odom.outputs:linearVelocity", "ros2_pub_odom.inputs:linearVelocity"),
+                    ("isaac_compute_odom.outputs:orientation", "ros2_pub_odom.inputs:orientation"),
+                    ("isaac_compute_odom.outputs:position", "ros2_pub_odom.inputs:position"),
+                ]
+            }
+        )
+        ros2_pub_tf_1_prim = self._stage.GetPrimAtPath(f"{graph_path}/ros2_pub_tf_1")
+        ros2_pub_tf_1_prim.GetRelationship("inputs:targetPrims").AddTarget(self._base_link_prim_path)        
+        ros2_pub_tf_1_prim.GetRelationship("inputs:parentPrim").AddTarget(self._base_link_prim_path)     
+        
+        ros2_pub_tf_2_prim = self._stage.GetPrimAtPath(f"{graph_path}/ros2_pub_tf_2")
+        ros2_pub_tf_2_prim.GetRelationship("inputs:parentPrim").AddTarget(self._base_link_prim_path)
+        ros2_pub_tf_2_prim.GetRelationship("inputs:targetPrims").AddTarget(f'{self._kmr_prim}/kmr_laser_B1_link')        
+        ros2_pub_tf_2_prim.GetRelationship("inputs:targetPrims").AddTarget(f'{self._kmr_prim}/kmr_laser_B4_link')
+
+        compute_odom_prim = self._stage.GetPrimAtPath(f"{graph_path}/isaac_compute_odom")
+        compute_odom_prim.GetRelationship("inputs:chassisPrim").AddTarget(self._base_link_prim_path)
+        print(f"[+] Created {graph_path}")
+
+
+
+    def _setup_publish_clock_graph(self, keys):
+        graph_prim_path = f"{self._og_scope_prim_path}/publish_clock_graph"
+        og.Controller.edit(
+            {"graph_path": graph_prim_path, "evaluator_name": "execution"},
+            {
+                keys.CREATE_NODES: [
+                    ("on_playback_tick", "omni.graph.action.OnPlaybackTick"),
+                    ("ros2_context", "omni.isaac.ros2_bridge.ROS2Context"),
+                    ("isaac_read_sim_time", "omni.isaac.core_nodes.IsaacReadSimulationTime"),
+                    ("ros2_publish_clock", "omni.isaac.ros2_bridge.ROS2PublishClock")
+                ],
+                keys.SET_VALUES: [
+                    ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
+
+                ],
+                keys.CONNECT: [
+                    ("on_playback_tick.outputs:tick", "ros2_publish_clock.inputs:execIn"),
+                    ("ros2_context.outputs:context", "ros2_publish_clock.inputs:context"),
+                    ("isaac_read_sim_time.outputs:simulationTime", "ros2_publish_clock.inputs:timeStamp"),
+                ]
+            }
+        )
     
     def _setup_twist_cmd_graph(self, keys):
         graph_prim_path = f"{self._og_scope_prim_path}/twist_cmd_graph"
@@ -265,6 +356,7 @@ class KMRLoader(BaseSample):
                     ("ros2_subscribe_twist", "omni.isaac.ros2_bridge.ROS2SubscribeTwist"),
                     ("break_3_vector_rot", "omni.graph.nodes.BreakVector3"),
                     ("break_3_vector_vel", "omni.graph.nodes.BreakVector3"),
+                    ("convert_to_stage_units", "omni.isaac.core_nodes.OgnIsaacScaleToFromStageUnit"),
                     ("make_3_vector", "omni.graph.nodes.MakeVector3"),
                     ("holonomic_controller", "omni.isaac.wheeled_robots.HolonomicController"),
                     ("articulation_controller", "omni.isaac.core_nodes.IsaacArticulationController"),
@@ -293,7 +385,8 @@ class KMRLoader(BaseSample):
                     ("ros2_context.outputs:context", "ros2_subscribe_twist.inputs:context"),
                     ("ros2_subscribe_twist.outputs:execOut", "holonomic_controller.inputs:execIn"),
                     ("ros2_subscribe_twist.outputs:angularVelocity", "break_3_vector_rot.inputs:tuple"),
-                    ("ros2_subscribe_twist.outputs:linearVelocity", "break_3_vector_vel.inputs:tuple"),
+                    ("ros2_subscribe_twist.outputs:linearVelocity", "convert_to_stage_units.inputs:value"),
+                    ("convert_to_stage_units.outputs:result", "break_3_vector_vel.inputs:tuple"),
                     ("break_3_vector_rot.outputs:z", "make_3_vector.inputs:z"),
                     ("break_3_vector_vel.outputs:x", "make_3_vector.inputs:x"),
                     ("break_3_vector_vel.outputs:y", "make_3_vector.inputs:y"),
@@ -388,7 +481,7 @@ class KMRLoader(BaseSample):
         usd_prim.GetRelationship("inputs:lidarPrim").AddTarget(lidar_prim_path)
         print(f"[+] Created {graph_path}")
 
-    def _setup_tf_graph(self, keys):
+    def _setup_tf_graph(self, keys, include_world_frame=False):
         graph_path = f"{self._og_scope_prim_path}/tf_pub_graph"
         og.Controller.edit(
             {"graph_path": graph_path, "evaluator_name": "execution"},
@@ -411,10 +504,11 @@ class KMRLoader(BaseSample):
         )
         usd_prim = self._stage.GetPrimAtPath(f"{graph_path}/ros2_pub_tf")
         usd_prim.GetRelationship("inputs:targetPrims").AddTarget(self._base_link_prim_path)        
+        if not include_world_frame:
+            usd_prim.GetRelationship("inputs:parentPrim").AddTarget(self._base_link_prim_path)        
         print(f"[+] Created {graph_path}")
 
     def _setup_odom_graph(self, keys):
-        # TODO!: Not connected to wheels!!!
         graph_path = f"{self._og_scope_prim_path}/odom_pub_graph"
         og.Controller.edit(
             {"graph_path": graph_path, "evaluator_name": "execution"},
@@ -430,6 +524,7 @@ class KMRLoader(BaseSample):
                 keys.SET_VALUES: [
                     ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
                     ("ros2_pub_raw_tf.inputs:topicName", "tf_raw"),
+                    ("ros2_pub_odom.inputs:chassisFrameId", self._base_link_frame_id)
                 ],
                 keys.CONNECT: [
                     ("on_playback_tick.outputs:tick", "isaac_compute_odom.inputs:execIn"),
