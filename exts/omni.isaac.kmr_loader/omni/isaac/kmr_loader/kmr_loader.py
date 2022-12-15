@@ -10,11 +10,10 @@ from omni.isaac.urdf import _urdf
 ENVIRONMENT_BASE_PATH = "omniverse://localhost/NVIDIA/Assets/Isaac/2022.1/Isaac/Environments/"
 # KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr.urdf"
 # KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr_wo_wheels.urdf"
-KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr_simple_camera_wo_wheels.urdf"
+KMR_PATH = "/home/jorgen/kmr_ws/src/kmr_description/urdf/robot/kmr_simple_camera_wo_wheels.urdf"
 # OMNIWHEELS_PATH = "/home/jorgen/isaac_ws/omniwheels/"
 OMNIWHEELS_PATH = "/home/jorgen/misc_repos/o3dynsimmodel/Parts/"
-OMNIWHEELS_SCALING_FACTOR = 0.875
-ROS2_FRAME_ID = "world"
+OMNIWHEELS_SCALING_FACTOR = 0.95
 ROS2_CONTEXT_DOMAIN_ID = 0
 
 
@@ -73,6 +72,12 @@ class KMRLoader(BaseSample):
         )
         self._base_link_frame_id = "base_link"
         self._base_link_prim_path = f'{self._kmr_prim}/{self._base_link_frame_id}'  # Later set as the articulation root
+
+        omni.kit.commands.execute("ChangeProperty",
+                prop_path=f"{self._kmr_prim}.xformOp:translate",
+                value=(0,0,0.025),
+                prev=(0,0,0)
+            )
 
         # [0, 0, 0] is underneath some shelves so when using environment "warehouse_multiple_shelves" the robot has to be moved
         if self.environment == "Simple_Warehouse/warehouse_multiple_shelves":
@@ -254,9 +259,6 @@ class KMRLoader(BaseSample):
         self._setup_iiwa_graph(keys)
         self._setup_lidar_graph(keys, is_front_lidar=True)
         self._setup_lidar_graph(keys, is_front_lidar=False)
-        # self._setup_tf_graph(keys, include_world_frame=True)
-        # self._setup_odom_graph(keys)
-
         self._setup_tf_odom_graph(keys)
         # for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
         #     self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)
@@ -319,8 +321,6 @@ class KMRLoader(BaseSample):
         compute_odom_prim = self._stage.GetPrimAtPath(f"{graph_path}/isaac_compute_odom")
         compute_odom_prim.GetRelationship("inputs:chassisPrim").AddTarget(self._base_link_prim_path)
         print(f"[+] Created {graph_path}")
-
-
 
     def _setup_publish_clock_graph(self, keys):
         graph_prim_path = f"{self._og_scope_prim_path}/publish_clock_graph"
@@ -481,72 +481,6 @@ class KMRLoader(BaseSample):
         usd_prim.GetRelationship("inputs:lidarPrim").AddTarget(lidar_prim_path)
         print(f"[+] Created {graph_path}")
 
-    def _setup_tf_graph(self, keys, include_world_frame=False):
-        graph_path = f"{self._og_scope_prim_path}/tf_pub_graph"
-        og.Controller.edit(
-            {"graph_path": graph_path, "evaluator_name": "execution"},
-            {
-                keys.CREATE_NODES: [
-                    ("on_playback_tick", "omni.graph.action.OnPlaybackTick"),
-                    ("ros2_context", "omni.isaac.ros2_bridge.ROS2Context"),
-                    ("isaac_read_sim_time", "omni.isaac.core_nodes.IsaacReadSimulationTime"),
-                    ("ros2_pub_tf", "omni.isaac.ros2_bridge.ROS2PublishTransformTree")
-                ],
-                keys.SET_VALUES: [
-                    ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
-                ],
-                keys.CONNECT: [
-                    ("on_playback_tick.outputs:tick", "ros2_pub_tf.inputs:execIn"),
-                    ("ros2_context.outputs:context", "ros2_pub_tf.inputs:context"),
-                    ("isaac_read_sim_time.outputs:simulationTime", "ros2_pub_tf.inputs:timeStamp"),
-                ]
-            }
-        )
-        usd_prim = self._stage.GetPrimAtPath(f"{graph_path}/ros2_pub_tf")
-        usd_prim.GetRelationship("inputs:targetPrims").AddTarget(self._base_link_prim_path)        
-        if not include_world_frame:
-            usd_prim.GetRelationship("inputs:parentPrim").AddTarget(self._base_link_prim_path)        
-        print(f"[+] Created {graph_path}")
-
-    def _setup_odom_graph(self, keys):
-        graph_path = f"{self._og_scope_prim_path}/odom_pub_graph"
-        og.Controller.edit(
-            {"graph_path": graph_path, "evaluator_name": "execution"},
-            {
-                keys.CREATE_NODES: [
-                    ("on_playback_tick", "omni.graph.action.OnPlaybackTick"),
-                    ("ros2_context", "omni.isaac.ros2_bridge.ROS2Context"),
-                    ("isaac_read_sim_time", "omni.isaac.core_nodes.IsaacReadSimulationTime"),
-                    ("isaac_compute_odom", "omni.isaac.core_nodes.IsaacComputeOdometry"),
-                    ("ros2_pub_odom", "omni.isaac.ros2_bridge.ROS2PublishOdometry"),
-                    ("ros2_pub_raw_tf", "omni.isaac.ros2_bridge.ROS2PublishRawTransformTree"),
-                ],
-                keys.SET_VALUES: [
-                    ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
-                    ("ros2_pub_raw_tf.inputs:topicName", "tf_raw"),
-                    ("ros2_pub_odom.inputs:chassisFrameId", self._base_link_frame_id)
-                ],
-                keys.CONNECT: [
-                    ("on_playback_tick.outputs:tick", "isaac_compute_odom.inputs:execIn"),
-                    ("on_playback_tick.outputs:tick", "ros2_pub_odom.inputs:execIn"),
-                    ("on_playback_tick.outputs:tick", "ros2_pub_raw_tf.inputs:execIn"),
-                    ("ros2_context.outputs:context", "ros2_pub_odom.inputs:context"),
-                    ("ros2_context.outputs:context", "ros2_pub_raw_tf.inputs:context"),
-                    ("isaac_read_sim_time.outputs:simulationTime", "ros2_pub_odom.inputs:timeStamp"),
-                    ("isaac_read_sim_time.outputs:simulationTime", "ros2_pub_raw_tf.inputs:timeStamp"),
-                    ("isaac_compute_odom.outputs:angularVelocity", "ros2_pub_odom.inputs:angularVelocity"),
-                    ("isaac_compute_odom.outputs:linearVelocity", "ros2_pub_odom.inputs:linearVelocity"),
-                    ("isaac_compute_odom.outputs:orientation", "ros2_pub_odom.inputs:orientation"),
-                    ("isaac_compute_odom.outputs:position", "ros2_pub_odom.inputs:position"),
-                    ("isaac_compute_odom.outputs:orientation", "ros2_pub_raw_tf.inputs:rotation"),
-                    ("isaac_compute_odom.outputs:position", "ros2_pub_raw_tf.inputs:translation"),
-                ]
-            }
-        )
-        usd_prim = self._stage.GetPrimAtPath(f"{graph_path}/isaac_compute_odom")
-        usd_prim.GetRelationship("inputs:chassisPrim").AddTarget(self._base_link_prim_path)
-        print(f"[+] Created {graph_path}")
-
     def _setup_camera_graph(self, keys, camera_prim_path, topic_suffix, viewport_id):
         graph_path = f"{self._og_scope_prim_path}/camera_{topic_suffix}_pub_graph"
         og.Controller.edit(
@@ -600,6 +534,7 @@ class KMRLoader(BaseSample):
 
 
     def _organize_stage(self):
+        # TODO: See if time to implement this
         omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
             prim_type="Scope",
             prim_path=f"{self._kmr_prim}/cameras",
