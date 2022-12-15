@@ -375,7 +375,8 @@ class KMRLoader(BaseSample):
                                                                     (-0.28, -0.1825, -0.2)]),
                     ("holonomic_controller.inputs:mecanumAngles", [-135, -45, -45, -135]),
                     ("holonomic_controller.inputs:maxLinearSpeed", 1.0),  # Max speed according to specifications
-                    ("holonomic_controller.inputs:maxAngularSpeed", 0.35),  # Actual max speed is 0.51 s/rad. Reduced as the robot jumps around at higher speeds
+                    ("holonomic_controller.inputs:maxAngularSpeed", 0.51),  # Max speed according to specifications
+                    ("holonomic_controller.inputs:angularGain", -1.0),  # Roration is oposite
                     ("articulation_controller.inputs:jointNames", ["wheel_fl_joint", "wheel_fr_joint", "wheel_rl_joint", "wheel_rr_joint"]),
                     ("articulation_controller.inputs:usePath", False),
                 ],
