@@ -5,6 +5,7 @@ from omni.isaac.core.utils.extensions import disable_extension, enable_extension
 from omni.isaac.core_nodes.scripts.utils import set_target_prims
 from omni.isaac.examples.base_sample import BaseSample
 from omni.isaac.urdf import _urdf
+import os
 # from omni.isaac.core.utils.utils import get_prim_path
 
 ENVIRONMENT_BASE_PATH = "omniverse://localhost/NVIDIA/Assets/Isaac/2022.1/Isaac/Environments/"
@@ -12,7 +13,8 @@ ENVIRONMENT_BASE_PATH = "omniverse://localhost/NVIDIA/Assets/Isaac/2022.1/Isaac/
 # KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr_wo_wheels.urdf"
 KMR_PATH = "/home/jorgen/kmr_ws/src/kmr_description/urdf/robot/kmr_simple_camera_wo_wheels.urdf"
 # OMNIWHEELS_PATH = "/home/jorgen/isaac_ws/omniwheels/"
-OMNIWHEELS_PATH = "/home/jorgen/misc_repos/o3dynsimmodel/Parts/"
+# OMNIWHEELS_PATH = "/home/jorgen/misc_repos/o3dynsimmodel/Parts/"
+OMNIWHEELS_PATH = f"{os.path.dirname(os.path.abspath(__file__))}/../../../data"
 OMNIWHEELS_SCALING_FACTOR = 0.95
 ROS2_CONTEXT_DOMAIN_ID = 0
 
@@ -22,11 +24,16 @@ class KMRLoader(BaseSample):
     def __init__(self) -> None:
         super().__init__()
         self.environment = "Simple_Warehouse/warehouse_with_forklifts"
+        self.create_camera_graph = False
         return
 
     def on_select_environment(self, env):
         self.environment = env
         print(self.environment, "selected")
+    
+    def on_enable_cameras(self, enable):
+        print('+++ create cameras', enable)
+        self.create_camera_graph = enable
 
     def setup_scene(self):
         disable_extension("omni.isaac.ros_bridge")
@@ -127,7 +134,7 @@ class KMRLoader(BaseSample):
             path="/Lidar",
             parent=parent_prim,
             min_range=0.4,
-            max_range=100.0,
+            max_range=30.0,  # From specs
             draw_points=False,
             draw_lines=False,
             horizontal_fov=horizontal_fov,
@@ -170,6 +177,7 @@ class KMRLoader(BaseSample):
 
         for prim_name, file_name in omniwheels.items():
             omniwheel_prim_path = f"{omniwheel_scope_prim_path}/{prim_name}"
+            print('+++', f"{omniwheels_path}/{file_name}.usd")
             omni.kit.commands.execute("CreateReference",
                 usd_context=omni.usd.get_context(),
                 path_to=omniwheel_prim_path,
@@ -260,8 +268,11 @@ class KMRLoader(BaseSample):
         self._setup_lidar_graph(keys, is_front_lidar=True)
         self._setup_lidar_graph(keys, is_front_lidar=False)
         self._setup_tf_odom_graph(keys)
-        # for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
-        #     self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)
+
+        # Concider disabeling cameras due to performance bottelnecs
+        if self.create_camera_graph:
+            for viewport_id, (camera_prim_path, topic_suffix) in enumerate(self._camera_prim_paths.items()):
+                self._setup_camera_graph(keys, camera_prim_path, topic_suffix, viewport_id)
         return
 
     def _setup_tf_odom_graph(self, keys):
