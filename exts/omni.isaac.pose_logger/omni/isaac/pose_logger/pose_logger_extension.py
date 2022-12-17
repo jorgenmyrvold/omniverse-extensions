@@ -2,7 +2,7 @@ import os
 import omni.ext
 import omni.ui as ui
 from omni.isaac.pose_logger.pose_logger import PoseLogger
-from omni.isaac.ui.ui_utils import setup_ui_headers, str_builder, btn_builder, dropdown_builder
+from omni.isaac.ui.ui_utils import setup_ui_headers, str_builder, btn_builder, dropdown_builder, cb_builder
 from omni.isaac.core import World
 import asyncio
 
@@ -38,6 +38,11 @@ class PoseLoggerExtension(omni.ext.IExt):
                     label="Select robot",
                     items=SELECTABLE_ROBOTS,
                     default_val=0,
+                )
+                self.ui_elements['Log arm cb'] = cb_builder(
+                    label='Log arm positions',
+                    default_val=False,
+                    on_clicked_fn=lambda enable: self.pose_logger.set_log_arm(enable),
                 )
                 self.ui_elements['Log output dir'] = str_builder(
                     label="Output filename",

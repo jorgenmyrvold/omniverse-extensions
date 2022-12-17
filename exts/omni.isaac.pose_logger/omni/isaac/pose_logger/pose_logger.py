@@ -7,7 +7,7 @@ import numpy as np
 O3DYN_BASE_LINK_PRIM_PATH = '/Root/base_link'
 O3DYN_WHEEL_PRIM_PATH = '/Root/wheel_drive/'
 
-KMR_BASE_LINK_PRIM_PATH = '/kmr/kmr_base_link'
+KMR_BASE_LINK_PRIM_PATH = '/kmr/base_link'
 KMR_WHEEL_PRIM_PATH = '/kmr/omniwheel_joints/'
 KMR_ARM_JOINT_PRIM_PATH = '/kmr/kmr_link_'  # Add only number 0-7 
 
@@ -19,9 +19,9 @@ class PoseLogger:
         self.stage = omni.usd.get_context().get_stage()
         self.timeline = omni.timeline.get_timeline_interface()
         self.pose = {}
+        self.log_arm = False
         return
     
-
     def load_world(self):
         async def load_world_async():
             world_settings = {"physics_dt": 1.0 / 60.0, "stage_units_in_meters": 1.0, "rendering_dt": 1.0 / 60.0}
@@ -32,11 +32,20 @@ class PoseLogger:
                 self._world = World.instance()
         asyncio.ensure_future(load_world_async())
 
+    def set_log_arm(self, enable):
+        self.log_arm = enable
+
     def set_selected_robot(self, robot):
         self.robot = robot
         if robot == 'KMR':
             self.wheel_prim_path = KMR_WHEEL_PRIM_PATH
             self.base_link_prim_path = KMR_BASE_LINK_PRIM_PATH
+            
+        elif robot == 'O3dyn':
+            self.wheel_prim_path = O3DYN_WHEEL_PRIM_PATH
+            self.base_link_prim_path = O3DYN_BASE_LINK_PRIM_PATH
+        
+        if self.log_arm:
             self.arm_pos_attr = {
                 'kmr_joint_1': self.stage.GetPrimAtPath(get_arm_joint_prim_path(0)).GetAttribute('state:angular:physics:position'),
                 'kmr_joint_2': self.stage.GetPrimAtPath(get_arm_joint_prim_path(1)).GetAttribute('state:angular:physics:position'),
@@ -46,10 +55,6 @@ class PoseLogger:
                 'kmr_joint_6': self.stage.GetPrimAtPath(get_arm_joint_prim_path(5)).GetAttribute('state:angular:physics:position'),
                 'kmr_joint_7': self.stage.GetPrimAtPath(get_arm_joint_prim_path(6)).GetAttribute('state:angular:physics:position'),
             }
-        elif robot == 'O3dyn':
-            self.wheel_prim_path = O3DYN_WHEEL_PRIM_PATH
-            self.base_link_prim_path = O3DYN_BASE_LINK_PRIM_PATH
-            self.arm_pos_attr = {}
 
         self.wheel_vel_attr = {
             'wheel_fl_joint': self.stage.GetPrimAtPath(f'{self.wheel_prim_path}wheel_fl_joint').GetAttribute('state:angular:physics:velocity'),
@@ -57,7 +62,6 @@ class PoseLogger:
             'wheel_rl_joint': self.stage.GetPrimAtPath(f'{self.wheel_prim_path}wheel_rl_joint').GetAttribute('state:angular:physics:velocity'),
             'wheel_rr_joint': self.stage.GetPrimAtPath(f'{self.wheel_prim_path}wheel_rr_joint').GetAttribute('state:angular:physics:velocity'),
         }
-
 
 
     def on_start_logging_event(self):
@@ -80,7 +84,7 @@ class PoseLogger:
                 "wheel_velocity_rl": self.wheel_vel_attr['wheel_rl_joint'].Get(),
                 "wheel_velocity_rr": self.wheel_vel_attr['wheel_rr_joint'].Get(),
             }
-            if self.arm_pos_attr:
+            if self.log_arm:
                 extra_data = {
                     'kmr_joint_1_pos': self.arm_pos_attr['kmr_joint_1'].Get(),
                     'kmr_joint_2_pos': self.arm_pos_attr['kmr_joint_2'].Get(),

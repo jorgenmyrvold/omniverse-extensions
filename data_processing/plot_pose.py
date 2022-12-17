@@ -58,9 +58,8 @@ class Preprocessor:
         
         plt.show()
 
-
 def main():
-    filepath = f'{os.path.dirname(__file__)}/data/output_data.json'
+    filepath = f'{os.path.dirname(__file__)}/data/slam_warehouse_with_forklifts.json'
     p = Preprocessor(filepath)
     p.read_json()
     p.process_data()

@@ -12,12 +12,10 @@ ENVIRONMENT_BASE_PATH = "omniverse://localhost/NVIDIA/Assets/Isaac/2022.1/Isaac/
 # KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr.urdf"
 # KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr_wo_wheels.urdf"
 KMR_PATH = "/home/jorgen/kmr_ws/src/kmr_description/urdf/robot/kmr_simple_camera_wo_wheels.urdf"
-# OMNIWHEELS_PATH = "/home/jorgen/isaac_ws/omniwheels/"
-# OMNIWHEELS_PATH = "/home/jorgen/misc_repos/o3dynsimmodel/Parts/"
+# OMNIWHEELS_PATH = "<PATH/TO/REPO>/o3dynsimmodel/Parts"  # Somethimes the path below does not work. Follow appendix and use this path in stead
 OMNIWHEELS_PATH = f"{os.path.dirname(os.path.abspath(__file__))}/../../../data"
 OMNIWHEELS_SCALING_FACTOR = 0.95
 ROS2_CONTEXT_DOMAIN_ID = 0
-
 
 
 class KMRLoader(BaseSample):
@@ -52,7 +50,6 @@ class KMRLoader(BaseSample):
         result = self._load_kmr()
         self._rig_robot()
         self._setup_omnigraphs()
-        self._organize_stage()
         return
     
     
@@ -177,7 +174,6 @@ class KMRLoader(BaseSample):
 
         for prim_name, file_name in omniwheels.items():
             omniwheel_prim_path = f"{omniwheel_scope_prim_path}/{prim_name}"
-            print('+++', f"{omniwheels_path}/{file_name}.usd")
             omni.kit.commands.execute("CreateReference",
                 usd_context=omni.usd.get_context(),
                 path_to=omniwheel_prim_path,
@@ -232,7 +228,7 @@ class KMRLoader(BaseSample):
                 path_from=joint_prim.GetPrimPath(),
                 path_to=f"{joint_scope_prim_path}/{prim_name[4:]}_joint"
             )
-        print("[+] Created omniwheels")
+            print(f"[+] Created {omniwheel_prim_path}")
 
     def _create_cameras(self):
         camera_suffixes = ["front", "manipulator", "right", "left"]
@@ -468,7 +464,7 @@ class KMRLoader(BaseSample):
                     ("ros2_pub_laser_scan", "omni.isaac.ros2_bridge.ROS2PublishLaserScan"),
                 ],
                 keys.SET_VALUES: [
-                    ("ros2_pub_laser_scan.inputs:topicName", f"/laser_scan{lidar_num}"),
+                    ("ros2_pub_laser_scan.inputs:topicName", f"/scan{lidar_num}"),
                     ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
                     ("ros2_pub_laser_scan.inputs:frameId", lidar_frame_id),
                 ],
@@ -543,24 +539,6 @@ class KMRLoader(BaseSample):
             }
         )
         print(f"[+] Created {graph_path}")
-
-
-    def _organize_stage(self):
-        # TODO: See if time to implement this
-        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
-            prim_type="Scope",
-            prim_path=f"{self._kmr_prim}/cameras",
-        )
-        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
-            prim_type="Scope",
-            prim_path=f"{self._kmr_prim}/gripper",
-        )
-        omni.kit.commands.execute("CreatePrimWithDefaultXformCommand",
-            prim_type="Scope",
-            prim_path=f"{self._kmr_prim}/arm",
-        )
-
-        
 
 
     async def setup_post_load(self):

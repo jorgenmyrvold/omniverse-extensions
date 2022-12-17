@@ -4,4 +4,3 @@
 2. Enable extension named "Pose logger alternativ" or `omni.isaac.pose_logger_alt`
 3. Start simulation
 4. Start logger
-6. 
