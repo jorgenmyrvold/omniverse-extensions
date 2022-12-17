@@ -67,6 +67,12 @@ class PoseLoggerExtension(omni.ext.IExt):
                 )
                 self.ui_elements['Save log button'].enabled = False
 
+                self.ui_elements['Print pose button'] = btn_builder(
+                    label='Print pose',
+                    text='Print',
+                    on_clicked_fn=self.pose_logger.print_pose
+                )
+
         
     def on_initialize_event(self):
         self.pose_logger.load_world()

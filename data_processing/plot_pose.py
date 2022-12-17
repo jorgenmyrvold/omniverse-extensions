@@ -43,13 +43,12 @@ class Preprocessor:
             self.all_joint_angles = np.vstack([self.joint_1_angles, self.joint_2_angles, self.joint_3_angles, self.joint_4_angles, self.joint_5_angles, self.joint_6_angles, self.joint_7_angles]).T
         
     def plot(self):
+        fig, ax = plt.subplots()
+        ax.plot(self.time_data, self.all_wheel_vel)
+        ax.set_title("Title")
 
         # fig, ax = plt.subplots()
-        # ax.plot(self.time_data, self.all_wheel_vel)
-        # ax.set_title("Title")
-
-        fig, ax = plt.subplots()
-        ax.plot(self.x_pos, self.y_pos)
+        # ax.plot(self.x_pos, self.y_pos)
 
         # fig, ax = plt.subplots()
         # ax.plot(self.time_data, self.all_joint_angles)
@@ -59,13 +58,16 @@ class Preprocessor:
         plt.show()
 
 def main():
-    filepath = f'{os.path.dirname(__file__)}/data/slam_warehouse_with_forklifts.json'
+    filepath = f'{os.path.dirname(__file__)}/data/slam_full_warehouse1.json'
+    # filepath = f'{os.path.dirname(__file__)}/important_data/slam_warehouse_with_forklifts.json'
     p = Preprocessor(filepath)
     p.read_json()
     p.process_data()
     p.extract_plot_data()
     p.plot()
+    # print(p.x_pos)
     return 
+
 
 
 if __name__ == '__main__':

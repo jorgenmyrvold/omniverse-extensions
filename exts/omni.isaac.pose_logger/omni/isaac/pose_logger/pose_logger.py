@@ -9,7 +9,7 @@ O3DYN_WHEEL_PRIM_PATH = '/Root/wheel_drive/'
 
 KMR_BASE_LINK_PRIM_PATH = '/kmr/base_link'
 KMR_WHEEL_PRIM_PATH = '/kmr/omniwheel_joints/'
-KMR_ARM_JOINT_PRIM_PATH = '/kmr/kmr_link_'  # Add only number 0-7 
+
 
 def get_arm_joint_prim_path(joint_id):
     return f'/kmr/kmr_link_{joint_id}/kmr_joint_{joint_id+1}'
@@ -75,8 +75,7 @@ class PoseLogger:
 
         def frame_logging_func_pose(tasks, scene):
             curr_prim = self.stage.GetPrimAtPath(self.base_link_prim_path)
-            timecode = self.timeline.get_current_time() * self.timeline.get_time_codes_per_seconds()
-            pose = omni.usd.utils.get_world_transform_matrix(curr_prim, timecode)
+            pose = omni.usd.get_world_transform_matrix(curr_prim)
             data = {
                 "base_link_transform_matrix": np.array(pose).tolist(),
                 "wheel_velocity_fl": self.wheel_vel_attr['wheel_fl_joint'].Get(),
@@ -113,7 +112,5 @@ class PoseLogger:
 
     def print_pose(self):
         curr_prim = self.stage.GetPrimAtPath(self.base_link_prim_path)
-        timecode = self.timeline.get_current_time() * self.timeline.get_time_codes_per_seconds()
-        pose = omni.usd.utils.get_world_transform_matrix(curr_prim, timecode)
-        print("Matrix:", pose)
+        pose = omni.usd.get_world_transform_matrix(curr_prim)
         print("Translation:", pose.ExtractTranslation())
