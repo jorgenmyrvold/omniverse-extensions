@@ -47,8 +47,8 @@ class Preprocessor:
         ax.plot(self.time_data, self.all_wheel_vel)
         ax.set_title("Title")
 
-        # fig, ax = plt.subplots()
-        # ax.plot(self.x_pos, self.y_pos)
+        fig1, ax1 = plt.subplots()
+        ax1.plot(self.x_pos, self.y_pos)
 
         # fig, ax = plt.subplots()
         # ax.plot(self.time_data, self.all_joint_angles)
@@ -58,7 +58,7 @@ class Preprocessor:
         plt.show()
 
 def main():
-    filepath = f'{os.path.dirname(__file__)}/data/slam_full_warehouse1.json'
+    filepath = f'{os.path.dirname(__file__)}/data/nav_warehouse_with_forklifts.json'
     # filepath = f'{os.path.dirname(__file__)}/important_data/slam_warehouse_with_forklifts.json'
     p = Preprocessor(filepath)
     p.read_json()

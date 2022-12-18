@@ -342,7 +342,6 @@ class KMRLoader(BaseSample):
                 ],
                 keys.SET_VALUES: [
                     ("ros2_context.outputs:context", ROS2_CONTEXT_DOMAIN_ID),
-
                 ],
                 keys.CONNECT: [
                     ("on_playback_tick.outputs:tick", "ros2_publish_clock.inputs:execIn"),
