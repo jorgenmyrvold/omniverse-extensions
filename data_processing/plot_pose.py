@@ -43,9 +43,9 @@ class Preprocessor:
             self.all_joint_angles = np.vstack([self.joint_1_angles, self.joint_2_angles, self.joint_3_angles, self.joint_4_angles, self.joint_5_angles, self.joint_6_angles, self.joint_7_angles]).T
         
     def plot(self):
-        fig, ax = plt.subplots()
-        ax.plot(self.time_data, self.all_wheel_vel)
-        ax.set_title("Title")
+        # fig, ax = plt.subplots()
+        # ax.plot(self.time_data, self.all_wheel_vel)
+        # ax.set_title("Title")
 
         fig1, ax1 = plt.subplots()
         ax1.plot(self.x_pos, self.y_pos)
@@ -58,7 +58,10 @@ class Preprocessor:
         plt.show()
 
 def main():
-    filepath = f'{os.path.dirname(__file__)}/data/nav_warehouse_with_forklifts_omni.json'
+    # filepath = f'{os.path.dirname(__file__)}/data/drive_data/drive_diagonal_square/drive_diagonal_square_reversed_2.json'
+    # filepath = f'{os.path.dirname(__file__)}/data/drive_data/drive_circle/drive_circle_2.json'
+    # filepath = f'{os.path.dirname(__file__)}/data/drive_data/drive_rotate/drive_rotate_reversed_2.json'
+    filepath = f'{os.path.dirname(__file__)}/data/drive_data/drive_square/drive_square_1.json'
     # filepath = f'{os.path.dirname(__file__)}/important_data/slam_warehouse_with_forklifts.json'
     p = Preprocessor(filepath)
     p.read_json()
