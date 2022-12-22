@@ -6,8 +6,8 @@ readme  = "docs/README.md"
 repository = "https://github.com/NVIDIA-Omniverse/kit-extension-template"
 category = "Example"
 keywords = ["kit", "example"]
-icon = "data/icon.png"
-preview_image = "data/preview.png"
+# icon = "data/icon.png"
+# preview_image = "data/preview.png"
 
 
 [dependencies]

@@ -2,7 +2,7 @@ import os
 import omni.ext
 import omni.ui as ui
 from omni.isaac.pose_logger.pose_logger import PoseLogger
-from omni.isaac.ui.ui_utils import setup_ui_headers, str_builder, btn_builder, dropdown_builder
+from omni.isaac.ui.ui_utils import setup_ui_headers, str_builder, btn_builder, dropdown_builder, cb_builder
 from omni.isaac.core import World
 import asyncio
 
@@ -22,7 +22,6 @@ def generate_datafile_name(filename):
 
 class PoseLoggerExtension(omni.ext.IExt):
     def on_startup(self, ext_id):
-        # self.load_world()
         self.pose_logger = PoseLogger()  # Logic part of extension
         self.ui_elements = {}
 
@@ -39,6 +38,11 @@ class PoseLoggerExtension(omni.ext.IExt):
                     label="Select robot",
                     items=SELECTABLE_ROBOTS,
                     default_val=0,
+                )
+                self.ui_elements['Log arm cb'] = cb_builder(
+                    label='Log arm positions',
+                    default_val=False,
+                    on_clicked_fn=lambda enable: self.pose_logger.set_log_arm(enable),
                 )
                 self.ui_elements['Log output dir'] = str_builder(
                     label="Output filename",
@@ -62,6 +66,12 @@ class PoseLoggerExtension(omni.ext.IExt):
                     on_clicked_fn=self.on_save_log_event,
                 )
                 self.ui_elements['Save log button'].enabled = False
+
+                self.ui_elements['Print pose button'] = btn_builder(
+                    label='Print pose',
+                    text='Print',
+                    on_clicked_fn=self.pose_logger.print_pose
+                )
 
         
     def on_initialize_event(self):

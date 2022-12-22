@@ -1,7 +1,7 @@
 import os
 from omni.isaac.examples.base_sample import BaseSampleExtension
 from omni.isaac.kmr_loader.kmr_loader import KMRLoader
-from omni.isaac.ui.ui_utils import get_style, dropdown_builder, btn_builder, str_builder, state_btn_builder
+from omni.isaac.ui.ui_utils import get_style, dropdown_builder, cb_builder, str_builder, state_btn_builder
 import omni.ui as ui
 
 
@@ -36,8 +36,13 @@ class KMRLoaderExtension(BaseSampleExtension):
 
                 self.ui_elements["Environment"] = dropdown_builder(
                     label="Environment",
-                    items=["Grid/default_environment", "Simple_Warehouse/warehouse_with_forklifts", "Simple_Warehouse/warehouse_multiple_shelves"],
+                    items=["Grid/default_environment", "Simple_Warehouse/warehouse_with_forklifts", "Simple_Warehouse/warehouse_multiple_shelves", "Simple_Warehouse/full_warehouse"],
                     default_val=1,
                     on_clicked_fn=lambda env: self.sample.on_select_environment(env),
                     tooltip="Select environment",
+                )
+                self.ui_elements['Use cameras'] = cb_builder(
+                    label='Publish cameras',
+                    default_val=False,
+                    on_clicked_fn=lambda enable: self.sample.on_enable_cameras(enable),
                 )
