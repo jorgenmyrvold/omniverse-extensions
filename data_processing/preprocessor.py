@@ -55,4 +55,18 @@ class Preprocessor:
             self.joint_6_angles = np.array([d['data']['kmr_joint_6_pos'] for d in self.raw_data])
             self.joint_7_angles = np.array([d['data']['kmr_joint_7_pos'] for d in self.raw_data])
             self.all_joint_angles = np.vstack([self.joint_1_angles, self.joint_2_angles, self.joint_3_angles, self.joint_4_angles, self.joint_5_angles, self.joint_6_angles, self.joint_7_angles]).T
-        
+
+
+class BagPreprocessor:
+    def __init__(self, filepath):
+        self.filepath = filepath
+        self.extract_data()
+    
+    def extract_plot_data(self):
+        with open(self.filepath, 'r') as f:
+            self.raw_data = json.load(f)
+
+        self.x_pos = np.array([d['x_pos'] for d in self.raw_data])
+        self.y_pos = np.array([d['y_pos'] for d in self.raw_data])
+        self.theta_rad = np.array([d['theta'] for d in self.raw_data])
+        self.theta_deg = self.theta_rad * np.pi/180

@@ -115,6 +115,9 @@ class DrivePlotter():
         ax2.grid(True, linestyle='--', color='gray')
         ax2.set_aspect('equal')
 
+class PlotBagData:
+    def __init__(self, filename):
+        return
 
 
 def main():
