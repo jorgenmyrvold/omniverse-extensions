@@ -8,7 +8,16 @@ FILEPATHS = {
     'drive_diagonal_square': f'{os.path.dirname(__file__)}/data/drive_data/drive_diagonal_square/drive_diagonal_square', 
     'drive_rotate': f'{os.path.dirname(__file__)}/data/drive_data/drive_rotate/drive_rotate', 
     'drive_square': f'{os.path.dirname(__file__)}/data/drive_data/drive_square/drive_square', 
+    'nav_omni': f'{os.path.dirname(__file__)}data/ros2bag_json/omni_nav_warehouse_with_forklifts.json',
+    'nav_diff': f'{os.path.dirname(__file__)}data/ros2bag_json/diff_nav_warehouse_with_forklifts.json',
+    'slam_fw': f'{os.path.dirname(__file__)}data/ros2bag_json/slam_full_warehouse.json',
+    'slam_wwf': f'{os.path.dirname(__file__)}data/ros2bag_json/slam_warehouse_with_forklifts.json',
 }
+
+def get_filepath(base_path, id, reversed):
+    if reversed:
+        return f'{base_path}_reversed_{id}.json'
+    return f'{base_path}_{id}.json'
 
 class Preprocessor:
     def __init__(self, filepath):
@@ -38,6 +47,7 @@ class Preprocessor:
         self.time = [d['current_time'] for d in self.raw_data]
         self.x_pos = np.array([d['data']['base_link_transform_matrix'][-1][0] for d in self.raw_data])
         self.y_pos = np.array([d['data']['base_link_transform_matrix'][-1][1] for d in self.raw_data])
+        self.z_pos = np.array([d['data']['base_link_transform_matrix'][-1][2] for d in self.raw_data])
         self.rot_matrix = np.array([d['data']['base_link_transform_matrix'][:3][:3] for d in self.raw_data])
 
         self.fl_vel = np.array([d['data']['wheel_velocity_fl'] for d in self.raw_data])
