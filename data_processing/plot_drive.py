@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import json
 import os
 
 from preprocessor import Preprocessor, get_filepath

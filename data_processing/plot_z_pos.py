@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import json
 import os
 
 from preprocessor import Preprocessor, get_filepath
@@ -32,9 +31,7 @@ class ZPosPlotter():
                     self.datasets[f'{dataset_key}_{id}'].z_pos,
                     label=f'{id+1}. Run',
             )
-            # ax.set_xticklabels([])
             ax.set_xticks([])
-            # ax.set_title(dataset_key)
             ax.text(1.0, 1.0, dataset_key, transform=ax.transAxes, ha='right', va='top')
 
 
@@ -55,7 +52,6 @@ def main():
     d1 = ZPosPlotter('dataset_drive_square')
     d1.plot()
     plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, hspace=0.1)
-    # plt.tight_layout()
     plt.show()
     return 
 
