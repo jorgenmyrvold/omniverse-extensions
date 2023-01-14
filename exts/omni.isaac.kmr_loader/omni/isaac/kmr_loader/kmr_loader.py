@@ -6,7 +6,6 @@ from omni.isaac.core_nodes.scripts.utils import set_target_prims
 from omni.isaac.examples.base_sample import BaseSample
 from omni.isaac.urdf import _urdf
 import os
-# from omni.isaac.core.utils.utils import get_prim_path
 
 ENVIRONMENT_BASE_PATH = "omniverse://localhost/NVIDIA/Assets/Isaac/2022.1/Isaac/Environments/"
 # KMR_PATH = "/home/jorgen/ros2-ws/src/kmr_description/urdf/robot/kmr.urdf"
@@ -14,6 +13,7 @@ ENVIRONMENT_BASE_PATH = "omniverse://localhost/NVIDIA/Assets/Isaac/2022.1/Isaac/
 KMR_PATH = "/home/jorgen/kmr_ws/src/kmr_description/urdf/robot/kmr_simple_camera_wo_wheels.urdf"
 # OMNIWHEELS_PATH = "<PATH/TO/REPO>/o3dynsimmodel/Parts"  # Somethimes the path below does not work. Follow appendix and use this path in stead
 OMNIWHEELS_PATH = f"{os.path.dirname(os.path.abspath(__file__))}/../../../data"
+
 OMNIWHEELS_SCALING_FACTOR = 0.95
 ROS2_CONTEXT_DOMAIN_ID = 0
 

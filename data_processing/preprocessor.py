@@ -41,10 +41,10 @@ class Preprocessor:
         sines = self.rot_matrix[:,1,0]
         cosines = self.rot_matrix[:,0,0]
         self.theta_rad = np.arctan2(sines, cosines)
-        self.theta_deg = self.theta_rad * np.pi/180
+        self.theta_deg = self.theta_rad * 180/np.pi
             
     def extract_plot_data(self):
-        self.time = [d['current_time'] for d in self.raw_data]
+        self.time = np.array([d['current_time'] for d in self.raw_data])
         self.x_pos = np.array([d['data']['base_link_transform_matrix'][-1][0] for d in self.raw_data])
         self.y_pos = np.array([d['data']['base_link_transform_matrix'][-1][1] for d in self.raw_data])
         self.z_pos = np.array([d['data']['base_link_transform_matrix'][-1][2] for d in self.raw_data])
@@ -56,7 +56,7 @@ class Preprocessor:
         self.rr_vel = np.array([d['data']['wheel_velocity_rr'] for d in self.raw_data])
         self.all_wheel_vel = np.vstack([self.fl_vel, self.fr_vel, self.rl_vel, self.rr_vel]).T
         
-        if 'kmr_joint_1_pos' in self.raw_data[0]['data']:
+        if 'kmr_joint_1_pos' in self.raw_data[0]['data']:  # Extracts joint data only if it exists
             self.joint_1_angles = np.array([d['data']['kmr_joint_1_pos'] for d in self.raw_data])
             self.joint_2_angles = np.array([d['data']['kmr_joint_2_pos'] for d in self.raw_data])
             self.joint_3_angles = np.array([d['data']['kmr_joint_3_pos'] for d in self.raw_data])
@@ -76,7 +76,12 @@ class BagPreprocessor:
         with open(self.filepath, 'r') as f:
             self.raw_data = json.load(f)
 
-        self.x_pos = np.array([d['x_pos'] for d in self.raw_data])
-        self.y_pos = np.array([d['y_pos'] for d in self.raw_data])
-        self.theta_rad = np.array([d['theta'] for d in self.raw_data])
-        self.theta_deg = self.theta_rad * np.pi/180
+        self.odom_x_pos = np.array([d['x_pos'] for d in self.raw_data['odom']])
+        self.odom_y_pos = np.array([d['y_pos'] for d in self.raw_data['odom']])
+        self.odom_theta_rad = np.array([d['theta'] for d in self.raw_data['odom']])
+        self.odom_theta_deg = self.theta_rad * np.pi/180
+
+        self.amcl_x_pos = np.array([d['x_pos'] for d in self.raw_data['amcl']])
+        self.amcl_y_pos = np.array([d['y_pos'] for d in self.raw_data['amcl']])
+        self.amcl_theta_rad = np.array([d['theta'] for d in self.raw_data['amcl']])
+        self.amcl_theta_deg = self.theta_rad * np.pi/180
