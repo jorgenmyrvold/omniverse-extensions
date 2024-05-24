@@ -1,6 +1,6 @@
 # Isaac sim extensions
 
-This is a repo containing extensions created for NVIDIA Isaac sim for my master's thesis at NTNU. 
+This is a repo containing extensions created for NVIDIA Isaac sim for my [master's thesis]([url](https://ntnuopen.ntnu.no/ntnu-xmlui/handle/11250/3066527)) at NTNU. 
 
 The thesis mainly concerns a KUKA KMR iiwa which is present at the MANULAB at NTNU in Trondheim.
 
